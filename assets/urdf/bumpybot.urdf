@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<robot name="bumpybot">
+
+  <link name="base">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value="20"/>
+       <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+    </inertial>
+    <visual>
+      <geometry>
+        <cylinder length="0.635" radius="0.2794"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 0.8 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
+      <geometry>
+        <cylinder length="0.635" radius="0.2794"/>
+      </geometry>
+      <sdf resolution="256"/>
+    </collision>
+  </link>
+
+  <link name="pointer">
+    <visual>
+      <geometry>
+        <box size="0.3 0.1 0.1"/>
+      </geometry>
+      <material name="green">
+        <color rgba="0 0.8 0 1"/>
+      </material>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+    </visual>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="0.0000001"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+    </inertial>
+  </link>
+
+  <joint name="joint" type="fixed">
+    <parent link="base"/>
+    <child link="pointer"/>
+    <origin rpy="0 0 0" xyz="0 0 0.4"/>
+  </joint>
+
+</robot>

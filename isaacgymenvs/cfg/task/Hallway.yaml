@@ -1,0 +1,74 @@
+# used to create the object
+name: Hallway
+
+physics_engine: ${..physics_engine}
+
+# if given, will override the device setting in gym.
+env: 
+  numEnvs: ${resolve_default:8192,${...num_envs}}
+  envSpacing: 1
+  episodeLength: 1000
+  controlFrequencyInv: 1
+  enableDebugVis: False
+
+  clipActions: 1.0
+
+  velocityGoal : 1.0
+  angVelocityGoal: 0
+  goalRadius: 1
+  goalBonus: 10
+  maxRange: 20.0
+
+  # cost parameters
+  actionsCost: 0 #0.01
+  poseCost: 0.01
+  angCost: 0.01
+  velocityCost: 0.001
+  angularVelocityCost: 0.01
+  contactCost: 0.001
+  contactLimit: 10 #[N], ~2.5 lbs
+  deathCost: -200
+
+  # control parameters
+  forceScale: 20 # F = ma => goal: 1 N force = 1 m/s/s acceleration
+  torqueScale: 1.28 # 1/0.78 T = Ia => goal: 1 Nm torque = 1 rad/s/s angular acceleration
+  # for a cylinder, I = 0.5*m*r^2 = 0.78 => m=20 kg r=0.2794 m 
+
+  asset:
+    assetFileName: "urdf/bumpybot.urdf"
+    wallsFileName: "urdf/walls.urdf"
+
+  target: [0, 10, 0]
+
+  plane:
+    staticFriction: 0.0
+    dynamicFriction: 0.0
+    restitution: 0.0
+
+  # set to True if you use camera sensors in the environment
+  enableCameraSensors: False
+
+viewer:
+  pos: [0.0, -15.0, 15.0]
+  target: [10.0, 30.0, 0.0]
+
+sim:
+  dt: 0.0166 # 1/60 s
+  substeps: 4
+  up_axis: "z"
+  use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
+  gravity: [0.0, 0.0, -9.81]
+  physx:
+    num_threads: ${....num_threads}
+    solver_type: ${....solver_type}
+    use_gpu: ${contains:"cuda",${....sim_device}} # set to False to run on CPU
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 2.0
+    default_buffer_size_multiplier: 5.0
+    max_gpu_contact_pairs: 8388608 # 8*1024*1024
+    num_subscenes: ${....num_subscenes}
+    contact_collection: 2 # 0: CC_NEVER (don't collect contact info), 1: CC_LAST_SUBSTEP (collect only contacts on last substep), 2: CC_ALL_SUBSTEPS (default - all contacts)
