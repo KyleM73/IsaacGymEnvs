@@ -2,6 +2,8 @@ import numpy as np
 import os
 import torch
 
+import EnvCreator
+
 from isaacgym import gymtorch
 from isaacgym import gymapi
 from isaacgym.torch_utils import *
@@ -107,26 +109,37 @@ class Hallway(VecTask):
         self.gym.add_ground(self.sim, plane_params)
 
     def _create_envs(self, num_envs, spacing, num_per_row):
-        lower = gymapi.Vec3(-spacing, -10, 0)
-        upper = gymapi.Vec3(spacing, 10, spacing)
+        lower = gymapi.Vec3(-spacing, -1, 0)
+        upper = gymapi.Vec3(spacing, 20, spacing)
 
         asset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets')
         asset_file = "urdf/bumpybot.urdf"
 
+        occ_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets')
+        occ_file = "occupancy/hall.png"
+
         walls_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets')
-        walls_file = "urdf/walls.urdf"
 
         if "asset" in self.cfg["env"]:
             asset_file = self.cfg["env"]["asset"].get("assetFileName", asset_file)
-            walls_file = self.cfg["env"]["asset"].get("wallsFileName", walls_file)
+            occ_file = self.cfg["env"]["asset"].get("occupancyFileName", occ_file)
         
         asset_path = os.path.join(asset_root, asset_file)
         asset_root = os.path.dirname(asset_path)
         asset_file = os.path.basename(asset_path)
 
-        walls_path = os.path.join(walls_root, walls_file)
+        occ_path = os.path.join(occ_root, occ_file)
+        occ_root = os.path.dirname(occ_path)
+
+        env_c = EnvCreator.envCreator(occ_path)
+        walls_path = env_c.get_urdf(occ_root)
         walls_root = os.path.dirname(walls_path)
         walls_file = os.path.basename(walls_path)
+
+        start = self.cfg["env"]["path"]["start"]
+        target = self.cfg["env"]["path"]["target"]
+        filter_dist = self.cfg["env"]["path"]["filterDist"]
+        self.path = env_c.get_path(start,target,filter_dist)
 
         asset_options = gymapi.AssetOptions()
         asset_options.collapse_fixed_joints = True
@@ -155,8 +168,25 @@ class Hallway(VecTask):
         start_pose.r = gymapi.Quat.from_euler_zyx(0, 0, np.pi/2) #face y axis
 
         walls_pose = gymapi.Transform()
-        walls_pose.p = gymapi.Vec3(0,-0.5,0.5)
+        walls_pose.p = gymapi.Vec3(0,0,0)
         walls_pose.r = gymapi.Quat.from_euler_zyx(0, 0, 0)
+
+        if self.cfg["sim"]["test"]:
+            path_path = env_c.path2urdf(self.path,occ_root)
+            path_root = os.path.dirname(path_path)
+            path_file = os.path.basename(path_path)
+
+            path_options = gymapi.AssetOptions()
+            path_options.collapse_fixed_joints = True
+            path_options.fix_base_link = True
+            path = self.gym.load_asset(self.sim, path_root, path_file, path_options)
+            path_bodies = self.gym.get_asset_rigid_body_count(path)
+
+            self.num_bodies += path_bodies
+
+            path_pose = gymapi.Transform()
+            path_pose.p = gymapi.Vec3(0,0,0)
+            path_pose.r = gymapi.Quat.from_euler_zyx(0, 0, 0)
 
         self.handles = []
         self.wall_handles = []
@@ -168,6 +198,7 @@ class Hallway(VecTask):
             handle = self.gym.create_actor(env, asset, start_pose, "bumpybot", i)
             walls_handle = self.gym.create_actor(env, walls, walls_pose, "walls", i) # take this out of loop and use  -1 as last arg so all actors can collide with same walls
     
+
             self.envs.append(env)
             self.handles.append(handle)
             self.wall_handles.append(walls_handle)
@@ -179,7 +210,8 @@ class Hallway(VecTask):
             props_shape[0].restitution = 0.0
             self.gym.set_actor_rigid_shape_properties(env, handle, props_shape)
 
-
+            if self.cfg["sim"]["test"]:
+                self.gym.create_actor(env, path, path_pose, "path", i)
 
     def _compute_reward(self, actions):
         self.rew_buf[:], self.reset_buf = compute_reward(

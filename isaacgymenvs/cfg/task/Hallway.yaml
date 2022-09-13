@@ -5,8 +5,8 @@ physics_engine: ${..physics_engine}
 
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:8192,${...num_envs}}
-  envSpacing: 1
+  numEnvs: ${resolve_default:2048,${...num_envs}}
+  envSpacing: 2
   episodeLength: 1000
   controlFrequencyInv: 1
   enableDebugVis: False
@@ -36,7 +36,13 @@ env:
 
   asset:
     assetFileName: "urdf/bumpybot.urdf"
-    wallsFileName: "urdf/walls.urdf"
+    #wallsFileName: "urdf/walls.urdf"
+    occupancyFileName: "occupancy/hall.png"
+
+  path:
+    start: [0,0]
+    target: [0,18]
+    filterDist: 1.0
 
   target: [0, 10, 0]
 
@@ -53,6 +59,7 @@ viewer:
   target: [10.0, 30.0, 0.0]
 
 sim:
+  test: ${...test}
   dt: 0.0166 # 1/60 s
   substeps: 4
   up_axis: "z"
