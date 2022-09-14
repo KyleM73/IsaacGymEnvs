@@ -9,19 +9,8 @@ from isaacgym import gymapi
 from isaacgym.torch_utils import *
 
 from isaacgymenvs.utils.torch_jit_utils import *
+from isaacgymenvs.utils.waypoint_checker import *
 from isaacgymenvs.tasks.base.vec_task import VecTask
-
-def apply_tensor_value(tensor,idx,value,num=None):
-    """
-    applies 'value' to 'tensor' at position 'idx' with step size 'num' 
-    """
-    if num is None and len(tensor.size()) == 2:
-        num = tensor.size()[1]
-    if num == 0:
-        tensor[idx, ...] = value
-    else:
-        tensor[idx::num, ...] = value
-    return tensor
 
 class Hallway(VecTask):
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
@@ -47,7 +36,7 @@ class Hallway(VecTask):
 
         self.max_episode_length = self.cfg["env"]["episodeLength"]
 
-        self.cfg["env"]["numObservations"] = 10
+        self.cfg["env"]["numObservations"] = 8
         self.cfg["env"]["numActions"] = 3
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
@@ -72,11 +61,22 @@ class Hallway(VecTask):
         self.initial_root_state = self.root_tensor.clone()
         self.initial_root_state[:, 7:13] = 0  #set velocities to zero
 
-        target = torch.tensor(self.cfg["env"]["target"]).to(torch.float)
-        self.targets = to_torch(self.cfg["env"]["target"], device=self.device).repeat((self.num_envs, 1))
-        self.target_dirs = to_torch((target/torch.norm(target)).tolist(), device=self.device).repeat((self.num_envs, 1))
-        ang = np.arccos(np.dot((target/torch.norm(target))[:2],torch.tensor([1,0]))).tolist()
-        self.target_angs = to_torch(ang, device=self.device).repeat((self.num_envs, 1))
+        self.path.insert(0,tuple(self.cfg["env"]["path"]["start"])) #append start location to beginning of path
+        self.path.insert(-1,tuple(self.cfg["env"]["path"]["target"])) #append target location to beginning of path
+        self.path = torch.tensor([list(p) for p in self.path]).to(self.device) #[n_wayptsx2]
+        
+        self.targets = torch.ones(self.num_envs,dtype=torch.long).to(self.device) #target waypoint index in sef.path. size: [num_envs]
+        #print(self.path.size())
+        #print(self.targets.size())
+        #print(self.path[self.targets])
+        
+        #target = torch.tensor(self.cfg["env"]["target"]).to(torch.float)
+        #self.targets = to_torch(self.cfg["env"]["target"], device=self.device).repeat((self.num_envs, 1))
+        #self.target_dirs = to_torch((target/torch.norm(target)).tolist(), device=self.device).repeat((self.num_envs, 1))
+
+        #ang = np.arccos(np.dot((target/torch.norm(target))[:2],torch.tensor([1,0]))).tolist()
+        #self.target_angs = to_torch(ang, device=self.device).repeat((self.num_envs, 1))
+
         self.dt = self.cfg["sim"]["dt"]
         self.goal_vel = self.cfg["env"]["velocityGoal"] * torch.ones(self.num_envs,1,device=self.device)
         self.goal_ang_vel = self.cfg["env"]["angVelocityGoal"] * torch.ones(self.num_envs,1,device=self.device)
@@ -198,7 +198,6 @@ class Hallway(VecTask):
             handle = self.gym.create_actor(env, asset, start_pose, "bumpybot", i)
             walls_handle = self.gym.create_actor(env, walls, walls_pose, "walls", i) # take this out of loop and use  -1 as last arg so all actors can collide with same walls
     
-
             self.envs.append(env)
             self.handles.append(handle)
             self.wall_handles.append(walls_handle)
@@ -214,11 +213,10 @@ class Hallway(VecTask):
                 self.gym.create_actor(env, path, path_pose, "path", i)
 
     def _compute_reward(self, actions):
-        self.rew_buf[:], self.reset_buf = compute_reward(
+        self.rew_buf[:], self.reset_buf, self.targets = compute_reward(
             self.obs_buf,
             self.reset_buf,
             self.progress_buf,
-            self.actions,
             self.actions_cost_scale,
             self.pose_cost_scale,
             self.ang_cost_scale,
@@ -231,7 +229,8 @@ class Hallway(VecTask):
             self.contact_cost,
             self.contact_lim,
             self.death_cost,
-            self.max_range
+            self.path,
+            self.targets
             )
 
     def _compute_observations(self):
@@ -240,13 +239,12 @@ class Hallway(VecTask):
 
         self.obs_buf[:] = compute_observations(
             self.root_tensor,
+            self.path,
             self.targets,
-            self.target_angs,
             self.goal_vel,
             self.goal_ang_vel,
             self.dt,
             self.actions,
-            self.max_range,
             self.num_bodies
             )
 
@@ -266,8 +264,8 @@ class Hallway(VecTask):
                                                      gymtorch.unwrap_tensor(random_root),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-        to_target = self.targets[env_ids] - random_root[env_ids, :3]
-        to_target[:, self.up_axis_idx] = 0
+        #to_target = self.targets[env_ids] - random_root[env_ids, :3]
+        #to_target[:, self.up_axis_idx] = 0
 
         self.progress_buf[env_ids] = 0
         self.reset_buf[env_ids] = 0
@@ -316,7 +314,6 @@ def compute_reward(
     obs_buf,
     reset_buf,
     progress_buf,
-    actions,
     actions_cost_scale,
     pose_cost_scale,
     ang_cost_scale,
@@ -329,53 +326,64 @@ def compute_reward(
     contact_cost_scale,
     contact_lim,
     death_cost,
-    max_range
+    path,
+    targets
     ):
-    # type: (Tensor, Tensor, Tensor, Tensor, float, float, float, float, float, float, float, float, Tensor, float, float, float, float) -> Tuple[Tensor, Tensor]
+    # type: (Tensor, Tensor, Tensor, float, float, float, float, float, float, float, float, Tensor, float, float, float, Tensor, Tensor) -> Tuple[Tensor, Tensor, Tensor]
 
-    actions_cost = actions_cost_scale * torch.sum(actions ** 2, dim=-1)
+    actions_cost = actions_cost_scale * torch.sum(obs_buf[:, 5:] ** 2, dim=-1)
 
-    pose_cost = pose_cost_scale * torch.linalg.norm(max_range * (obs_buf[:, :2] - obs_buf[:, 2:4]),dim=1)
+    pose = torch.linalg.norm(obs_buf[:, :2],dim=-1)
+    pose_reward = pose_cost_scale * 1.0 / (1.0 + pose * pose)
 
-    vel_cost = velocity_cost_scale * torch.abs(obs_buf[:, 4])
+    vel = torch.abs(obs_buf[:, 2])
+    vel_reward = velocity_cost_scale * 1.0 / (1.0 + vel * vel)
 
-    ang_cost = ang_cost_scale * torch.abs(obs_buf[:, 5])
+    ang = torch.abs(obs_buf[:, 3])
+    ang_reward = ang_cost_scale * 1.0 / (1.0 + ang * ang)
 
-    ang_vel_cost = ang_velocity_cost_scale * torch.abs(obs_buf[:, 6])
+    ang_vel = torch.abs(obs_buf[:, 4])
+    ang_vel_reward = ang_velocity_cost_scale * 1.0 / (1.0 + ang_vel * ang_vel)
 
     contact_cost = contact_cost_scale * torch.linalg.norm(fsdata[:, :2],dim=-1)
 
-    total_reward = - actions_cost - pose_cost - ang_cost - vel_cost - ang_vel_cost - contact_cost
+    total_reward = pose_reward + vel_reward + ang_reward + ang_vel_reward - actions_cost - contact_cost
 
     # terminal costs
-    total_reward = torch.where(pose_cost < pose_cost_scale * goal_radius, total_reward + goal_bonus, total_reward)
+    total_reward = torch.where(pose < goal_radius, total_reward + goal_bonus, total_reward)
 
     # adjust reward for dead agents
     total_reward = torch.where(contact_cost > contact_cost_scale * contact_lim, torch.ones_like(total_reward) * death_cost, total_reward)
 
+    # update targets
+    update_conds = (pose < goal_radius) | (check_waypoints(obs_buf[:, :2]+path[targets],path,targets))
+    targets = torch.where(update_conds,targets+1,targets)
+
     # reset agents
-    conds = (contact_cost > contact_cost_scale * contact_lim) | (progress_buf >= max_episode_length - 1)
-    reset = torch.where(conds, torch.ones_like(reset_buf), reset_buf) #last arg "reset"
+    reset_conds = (contact_cost > contact_cost_scale * contact_lim) | (progress_buf >= max_episode_length - 1) | (targets > len(path)-2)
+    reset = torch.where(reset_conds, torch.ones_like(reset_buf), reset_buf) #last arg "reset"
+
+    # reset targets
+    targets = torch.where(reset_conds,1,targets)
 
     ## TODO
     # - add power usage terms
     # - timeout bootstrapping (see ETH parallel walking paper)
 
-    return total_reward, reset
+    return total_reward, reset, targets
 
 @torch.jit.script
 def compute_observations(
     root_states,
+    path,
     targets,
-    target_angs,
     goal_vel,
     goal_ang_vel,
     dt,
     actions,
-    max_range,
     num_bodies
     ):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, float, Tensor, float, int) -> Tensor
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, float, Tensor, int) -> Tensor
 
     # x y th vx vy vth gx gy gth ang2target gv fx fy fth
 
@@ -384,21 +392,25 @@ def compute_observations(
     velocity = root_states[::num_bodies, 7:10]
     ang_velocity = root_states[::num_bodies, 10:13]
 
+    pose_error = position[:, :2] - path[targets]
+
     _,_,yaw = get_euler_xyz(rotation)
     heading = normalize_angle(yaw).unsqueeze(-1)
+
+    dot_prod = torch.einsum('ij,ij->i',position[:, :2],path[targets])
+    dot_prod /= torch.linalg.norm(position[:, :2]+1e-7,dim=-1)
+    dot_prod /= torch.linalg.norm(path[targets]+1e-7,dim=-1)
+    dot_prod = torch.clamp(dot_prod,-1+1e-7,1-1e-7)
+    target_angs = torch.arccos(dot_prod).view(-1,1)
+
     heading_err = heading - target_angs
 
-    ang_vel_error = torch.linalg.norm(ang_velocity[:,2],dim=-1) - goal_ang_vel #1
+    vel_error = torch.linalg.norm(velocity[:,:2],dim=-1).view(-1,1) - goal_vel #[1]
 
-    # Normalize Observations
-    position_norm = position[:,:2] / max_range
-    targets_norm = targets[:,:2] / max_range
+    ang_vel_error = torch.linalg.norm(ang_velocity[:,2],dim=-1) - goal_ang_vel #[1]
 
-    velocity_norm = torch.linalg.norm(velocity[:,:2],dim=-1).view(-1,1) / (goal_vel + 1e-9) - 1
-    velocity_norm = torch.clamp(velocity_norm,-1,2) #somewhat arbitrary bounds
-
-    # obs_buf shapes: 2, 2, 1, 1, 1, num_acts(3)
-    obs = torch.cat((position_norm,targets_norm,velocity_norm,
-        heading_err,ang_vel_error,actions),dim=-1) #10
+    # obs_buf shapes: 2, 1, 1, 1, num_acts(3)
+    obs = torch.cat((pose_error,vel_error,
+        heading_err,ang_vel_error,actions),dim=-1) #8
 
     return obs

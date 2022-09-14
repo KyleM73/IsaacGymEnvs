@@ -7,7 +7,7 @@ physics_engine: ${..physics_engine}
 env: 
   numEnvs: ${resolve_default:2048,${...num_envs}}
   envSpacing: 2
-  episodeLength: 1000
+  episodeLength: 500
   controlFrequencyInv: 1
   enableDebugVis: False
 
@@ -15,7 +15,7 @@ env:
 
   velocityGoal : 1.0
   angVelocityGoal: 0
-  goalRadius: 1
+  goalRadius: 0.1
   goalBonus: 10
   maxRange: 20.0
 
@@ -23,11 +23,11 @@ env:
   actionsCost: 0 #0.01
   poseCost: 0.01
   angCost: 0.01
-  velocityCost: 0.001
+  velocityCost: 0.01 #0.001
   angularVelocityCost: 0.01
-  contactCost: 0.001
-  contactLimit: 10 #[N], ~2.5 lbs
-  deathCost: -200
+  contactCost: 0.01 #0.001
+  contactLimit: 20 #[N], ~5 lbs
+  deathCost: -1
 
   # control parameters
   forceScale: 20 # F = ma => goal: 1 N force = 1 m/s/s acceleration
@@ -41,8 +41,8 @@ env:
 
   path:
     start: [0,0]
-    target: [0,18]
-    filterDist: 1.0
+    target: [0,15]
+    filterDist: 0.9
 
   target: [0, 10, 0]
 
