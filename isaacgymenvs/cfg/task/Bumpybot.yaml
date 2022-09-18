@@ -1,14 +1,14 @@
 # used to create the object
-name: Hallway
+name: Bumpybot
 
 physics_engine: ${..physics_engine}
 
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:8192,${...num_envs}}
-  envSpacing: 2
-  episodeLength: 1000
-  controlFrequencyInv: 1
+  numEnvs: ${resolve_default:128,${...num_envs}}
+  envSpacing: 3
+  episodeLength: 500
+  controlFrequencyInv: 5
   enableDebugVis: False
 
   clipActions: 1.0
@@ -22,7 +22,7 @@ env:
   # cost parameters
   actionsCost: 0.01
   poseCost: 0.01
-  angCost: 0.02
+  angCost: 0.1
   velocityCost: 0.01 #0.001
   angularVelocityCost: 0.01
   contactCost: 0.01 #0.001
@@ -36,8 +36,9 @@ env:
 
   asset:
     assetFileName: "urdf/bumpybot.urdf"
-    #wallsFileName: "urdf/walls.urdf"
-    occupancyFileName: "occupancy/hall.png"
+    #occupancyFileName: "occupancy/hall.png"
+    occupancyFileName: "occupancy/easy_maze.png"
+    reflect: True
 
   path:
     start: [0,0]
@@ -50,7 +51,14 @@ env:
     restitution: 0.0
 
   # set to True if you use camera sensors in the environment
-  enableCameraSensors: False
+  enableCameraSensors: True
+
+image:
+  height: 128
+  width: 128
+  depth: 1
+  range: 10
+  updateFreq: 10 #Hz
 
 viewer:
   pos: [0.0, -15.0, 15.0]
@@ -58,7 +66,7 @@ viewer:
 
 sim:
   test: ${...test}
-  dt: 0.0166 # 1/60 s
+  dt: 0.01 # 1/100 s
   substeps: 4
   up_axis: "z"
   use_gpu_pipeline: ${eq:${...pipeline},"gpu"}

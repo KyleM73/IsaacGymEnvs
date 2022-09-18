@@ -12,7 +12,7 @@ from rl_games.algos_torch.d2rl import D2RLNet
 from rl_games.algos_torch.network_builder import *
 
 
-class Multi_Input_A2CBuilder(NetworkBuilder):
+class Multi_Input_Replay_A2CBuilder(NetworkBuilder):
     def __init__(self, **kwargs):
         NetworkBuilder.__init__(self)
 
@@ -37,6 +37,7 @@ class Multi_Input_A2CBuilder(NetworkBuilder):
             self.critic_cnn = nn.Sequential()
             self.actor_mlp = nn.Sequential()
             self.critic_mlp = nn.Sequential()
+            self.img_features = None
 
             linear_proj_args = {
             'input_size' : vec_num_inputs,
@@ -126,6 +127,11 @@ class Multi_Input_A2CBuilder(NetworkBuilder):
             obs = obs_dict['obs']
             img = obs['img']
             vec = obs['vec']
+            flag = obs['update_img']
+            print(img.size())
+            print(vec.size())
+            print(flag.size())
+            assert False
             states = obs_dict.get('rnn_states', None)
             seq_length = obs_dict.get('seq_length', 1)
             dones = obs_dict.get('dones', None)
@@ -174,9 +180,13 @@ class Multi_Input_A2CBuilder(NetworkBuilder):
 
                     return mu, sigma, value, states
             else:
-                out = img
-                out = self.actor_cnn(out)
-                out = out.flatten(1)
+                if flag or self.img_features is None:
+                    out = img
+                    out = self.actor_cnn(out)
+                    out = out.flatten(1)
+                    self.img_features = out
+                else:
+                    out = self.img_features
                 out = torch.cat((out,vec_out),dim=1)               
                 out = self.actor_mlp(out)
 

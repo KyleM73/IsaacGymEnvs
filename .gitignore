@@ -31,3 +31,4 @@ outputs/
 *.hydra*
 /isaacgymenvs/wandb
 */occupancy/*.urdf
+tmp_imgs/

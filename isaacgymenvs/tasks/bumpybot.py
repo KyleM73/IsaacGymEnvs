@@ -1,6 +1,12 @@
+from typing import Dict, Any, Tuple
+
+import gym
+from gym import spaces
+
 import numpy as np
 import os
 import torch
+import imageio
 
 import EnvCreator
 
@@ -10,10 +16,12 @@ from isaacgym.torch_utils import *
 
 from isaacgymenvs.utils.torch_jit_utils import *
 from isaacgymenvs.utils.waypoint_checker import *
+from isaacgymenvs.utils.np_formatting import *
 from isaacgymenvs.tasks.base.vec_task import VecTask
 
-class Hallway(VecTask):
+class Bumpybot(VecTask):
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
+        set_np_formatting()
         self.cfg = cfg
 
         self.actions_cost_scale = self.cfg["env"]["actionsCost"]
@@ -29,6 +37,17 @@ class Hallway(VecTask):
         self.torque_scale = self.cfg["env"]["torqueScale"]
         self.max_range = self.cfg["env"]["maxRange"]
 
+        self.img_h = self.cfg["image"]["height"]
+        self.img_w = self.cfg["image"]["width"]
+        self.img_d = self.cfg["image"]["depth"]
+        if self.img_d == 1:
+            self.img_type = gymapi.IMAGE_DEPTH
+        else:
+            self.img_type = gymapi.IMAGE_COLOR
+            self.img_d = 3
+        self.cam_max_range = self.cfg["image"]["range"]
+        self.update_freq = self.cfg["image"]["updateFreq"]
+
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
         self.plane_static_friction = self.cfg["env"]["plane"]["staticFriction"]
         self.plane_dynamic_friction = self.cfg["env"]["plane"]["dynamicFriction"]
@@ -41,6 +60,14 @@ class Hallway(VecTask):
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
         
+        self.img_obs_space = spaces.Box(low=0,high=1,shape=(self.img_w,self.img_h,self.img_d))
+        self.vec_obs_space = self.obs_space
+        self.obs_space = spaces.Dict(
+            spaces={
+            "vec" : self.vec_obs_space,
+            "img" : self.img_obs_space,
+            })
+
         if self.viewer != None:
             cam_pos = gymapi.Vec3(*self.cfg["viewer"]["pos"])
             cam_target = gymapi.Vec3(*self.cfg["viewer"]["target"])
@@ -55,27 +82,14 @@ class Hallway(VecTask):
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_force_sensor_tensor(self.sim)
 
-        #print(self.root_tensor.size()) #[4,13] with 2 envs
-        #print(self.net_cf.size()) #[num_envs*num_bodies,3]
-
         self.initial_root_state = self.root_tensor.clone()
         self.initial_root_state[:, 7:13] = 0  #set velocities to zero
 
         self.path.insert(0,tuple(self.cfg["env"]["path"]["start"])) #append start location to beginning of path
         self.path.insert(-1,tuple(self.cfg["env"]["path"]["target"])) #append target location to beginning of path
         self.path = torch.tensor([list(p) for p in self.path]).to(self.device) #[n_wayptsx2]
-        
-        self.targets = torch.ones(self.num_envs,dtype=torch.long).to(self.device) #target waypoint index in sef.path. size: [num_envs]
-        #print(self.path.size())
-        #print(self.targets.size())
-        #print(self.path[self.targets])
-        
-        #target = torch.tensor(self.cfg["env"]["target"]).to(torch.float)
-        #self.targets = to_torch(self.cfg["env"]["target"], device=self.device).repeat((self.num_envs, 1))
-        #self.target_dirs = to_torch((target/torch.norm(target)).tolist(), device=self.device).repeat((self.num_envs, 1))
 
-        #ang = np.arccos(np.dot((target/torch.norm(target))[:2],torch.tensor([1,0]))).tolist()
-        #self.target_angs = to_torch(ang, device=self.device).repeat((self.num_envs, 1))
+        self.targets = torch.ones(self.num_envs,dtype=torch.long).to(self.device) #target waypoint index in sef.path. size: [num_envs]
 
         self.dt = self.cfg["sim"]["dt"]
         self.goal_vel = self.cfg["env"]["velocityGoal"] * torch.ones(self.num_envs,1,device=self.device)
@@ -83,10 +97,11 @@ class Hallway(VecTask):
         self.goal_radius = self.cfg["env"]["goalRadius"]
         self.goal_bonus = self.cfg["env"]["goalBonus"]
 
-        #self.gym.refresh_dof_state_tensor(self.sim)
-        #self.gym.refresh_dof_force_tensor(self.sim)
+        self.steps = 0
+        self.step_inc = self.cfg["env"]["controlFrequencyInv"]
 
-        #print(self.root_tensor)
+        self._get_images()
+        self.init_img_tensor = self.img_tensor.clone()
 
     def create_sim(self):
         # implement sim set up and environment creation here
@@ -94,6 +109,7 @@ class Hallway(VecTask):
         #    - call super().create_sim with device args (see docstring)
         #    - create ground plane
         #    - set up environments
+        self.graphics_device_id = self.device_id
         self.up_axis_idx = 2 # index of up axis: Y=1, Z=2
         self.sim = super().create_sim(self.device_id, self.graphics_device_id, self.physics_engine, self.sim_params)
 
@@ -131,10 +147,15 @@ class Hallway(VecTask):
         occ_path = os.path.join(occ_root, occ_file)
         occ_root = os.path.dirname(occ_path)
 
-        env_c = EnvCreator.envCreator(occ_path)
+        env_c = EnvCreator.humanEnvCreator(occ_path)
         walls_path = env_c.get_urdf_fast(occ_root)
         walls_root = os.path.dirname(walls_path)
         walls_file = os.path.basename(walls_path)
+
+        #env_c_flip = EnvCreator.humanEnvCreator(occ_path,flip=True)
+        #walls_path_flip = env_c.get_urdf_fast(occ_root)
+        #walls_root_flip = os.path.dirname(walls_path)
+        #walls_file_flip = os.path.basename(walls_path)
 
         start = self.cfg["env"]["path"]["start"]
         target = self.cfg["env"]["path"]["target"]
@@ -152,7 +173,7 @@ class Hallway(VecTask):
         sensor_props = gymapi.ForceSensorProperties()
         sensor_props.enable_forward_dynamics_forces = False
         sensor_props.enable_constraint_solver_forces = True
-        sensor_props.use_world_frame = False
+        sensor_props.use_world_frame = True #false??
         sensor_idx = self.gym.create_asset_force_sensor(asset, base_idx, sensor_pose, sensor_props)
 
         walls_options = gymapi.AssetOptions()
@@ -171,6 +192,16 @@ class Hallway(VecTask):
         walls_pose.p = gymapi.Vec3(0,0,0)
         walls_pose.r = gymapi.Quat.from_euler_zyx(0, 0, 0)
 
+        camera_props = gymapi.CameraProperties()
+        camera_props.width = self.img_w
+        camera_props.height = self.img_h
+        camera_props.use_collision_geometry = True
+        camera_props.enable_tensors = True
+
+        local_transform = gymapi.Transform()
+        local_transform.p = gymapi.Vec3(0,0.25,0.3) # get real values from robot
+        local_transform.r = gymapi.Quat.from_euler_zyx(0, 0, np.pi/2)
+
         if self.cfg["sim"]["test"]:
             path_path = env_c.path2urdf(self.path,occ_root)
             path_root = os.path.dirname(path_path)
@@ -185,11 +216,13 @@ class Hallway(VecTask):
             self.num_bodies += path_bodies
 
             path_pose = gymapi.Transform()
-            path_pose.p = gymapi.Vec3(0,0,0)
+            path_pose.p = gymapi.Vec3(0,0,0) # waypoints above env so camera cant see them
             path_pose.r = gymapi.Quat.from_euler_zyx(0, 0, 0)
 
         self.handles = []
         self.wall_handles = []
+        self.camera_handles = []
+        self.cam_tensors = []
         self.envs = []
 
         for i in range(self.num_envs):
@@ -197,10 +230,18 @@ class Hallway(VecTask):
             env = self.gym.create_env(self.sim, lower, upper, num_per_row)
             handle = self.gym.create_actor(env, asset, start_pose, "bumpybot", i)
             walls_handle = self.gym.create_actor(env, walls, walls_pose, "walls", i) # take this out of loop and use  -1 as last arg so all actors can collide with same walls
-    
+            camera_handle = self.gym.create_camera_sensor(env, camera_props)
+
+            self.gym.attach_camera_to_body(camera_handle, env, handle, local_transform, gymapi.FOLLOW_TRANSFORM) #gymapi.FOLLOW_TRANSFORM,gymapi.FOLLOW_POSITION doesnt rotate with robot
+
             self.envs.append(env)
             self.handles.append(handle)
             self.wall_handles.append(walls_handle)
+            self.camera_handles.append(camera_handle)
+
+            cam_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, env, camera_handle, self.img_type)
+            torch_cam_tensor = gymtorch.wrap_tensor(cam_tensor)
+            self.cam_tensors.append(torch_cam_tensor)
 
             props_shape = self.gym.get_actor_rigid_shape_properties(env, handle)
             props_shape[0].rolling_friction = 0.0
@@ -211,6 +252,30 @@ class Hallway(VecTask):
 
             if self.cfg["sim"]["test"]:
                 self.gym.create_actor(env, path, path_pose, "path", i)
+
+    def allocate_buffers(self):
+        super().allocate_buffers()
+        self.img_tensor = torch.zeros(self.num_envs,self.img_w,self.img_h,self.img_d,device=self.device)
+
+    def _get_images(self):
+        if self.steps % self.update_freq:
+            return
+        #img_dir = "tmp_imgs"
+        #if not os.path.exists(img_dir):
+        #    os.mkdir(img_dir)
+        self.gym.fetch_results(self.sim,True)
+        self.gym.step_graphics(self.sim)
+        self.gym.render_all_camera_sensors(self.sim)
+        self.gym.start_access_image_tensors(self.sim)
+        for i in range(self.num_envs):
+            img = self.cam_tensors[i].view(self.img_w,self.img_h,self.img_d)
+            self.img_tensor[i,...] = self._normalize_image(img)
+            #fname = os.path.join(img_dir, "cam-%04d.png" % i)
+            #imageio.imwrite(fname, 255*self._normalize_image(img).cpu().numpy())
+        self.gym.end_access_image_tensors(self.sim)
+
+    def _normalize_image(self,img):
+        return normalize_image(img,self.cam_max_range)
 
     def _compute_reward(self, actions):
         self.rew_buf[:], self.reset_buf, self.targets = compute_reward(
@@ -250,12 +315,13 @@ class Hallway(VecTask):
 
     def reset_idx(self, env_ids):
 
-        positions = torch.cat((
-            torch_rand_float(-0.2, 0.2, (len(env_ids), 1), device=self.device),
-            torch.zeros(len(env_ids),12,device=self.device)
+        vels = torch.cat((
+            torch.zeros(len(env_ids),7,device=self.device), #pose,quat
+            torch_rand_float(-0.1, 0.1, (len(env_ids),2), device=self.device), #vx,vy
+            torch.zeros(len(env_ids),4,device=self.device) #vy,v_ang
             ),dim=-1)
         pose = torch.zeros_like(self.initial_root_state)
-        pose[self.num_bodies*env_ids] = positions
+        pose[self.num_bodies*env_ids] = vels
 
         random_root = self.initial_root_state + pose
 
@@ -264,19 +330,14 @@ class Hallway(VecTask):
                                                      gymtorch.unwrap_tensor(random_root),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-        #to_target = self.targets[env_ids] - random_root[env_ids, :3]
-        #to_target[:, self.up_axis_idx] = 0
-
         self.progress_buf[env_ids] = 0
         self.reset_buf[env_ids] = 0
+        self.img_tensor[env_ids] = self.init_img_tensor[env_ids]
 
     def pre_physics_step(self, actions):
         # implement pre-physics simulation code here
         #    - e.g. apply actions
         # apply  forces
-        # for testing:
-        #actions = torch.zeros_like(actions)
-        #actions[:,:] = torch.tensor([-0.05,1,0]).repeat((self.num_envs,1))
         
         self.actions = actions.to(self.device).clone()
 
@@ -293,21 +354,54 @@ class Hallway(VecTask):
         #    - e.g. compute reward, compute observations
         self.progress_buf += 1
 
-        #print(get_euler_xyz(self.obs_buf[:, 3:7]))
-        #<cylinder length="0.635" radius="0.2794" />
-        # <mass value="4.53592"/>
-
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         if len(env_ids) > 0:
             self.reset_idx(env_ids)
 
+        self._get_images()
         self._compute_observations()
         self._compute_reward(self.actions)
+
+        self.steps += self.step_inc
+
+    def step(self, actions: torch.Tensor) -> Tuple[Dict[str, torch.Tensor], torch.Tensor, torch.Tensor, Dict[str, Any]]:
+        out = super().step(actions)
+        vec_obs = out[0]["obs"] #self.obs_dict
+        self.obs_dict["obs"] = {
+            "vec":vec_obs,
+            "img":self.img_tensor
+            }
+        return self.obs_dict,*out[1:]
+
+    def reset(self):
+        self.obs_dict = super().reset()
+        self.obs_dict["obs"] = {
+            "vec":torch.clamp(self.obs_buf, -self.clip_obs, self.clip_obs).to(self.rl_device),
+            "img":self.img_tensor
+            }
+
+        return self.obs_dict
+
+    def reset_done(self):
+        self.obs_dict,done_env_ids = super().reset_done()
+        self.obs_dict["obs"] = {
+        "vec":torch.clamp(self.obs_buf, -self.clip_obs, self.clip_obs).to(self.rl_device),
+        "img":self.img_tensor
+        }
+
+        return self.obs_dict, done_env_ids
 
 
 #####################################################################
 ###=========================jit functions=========================###
 #####################################################################
+
+@torch.jit.script
+def normalize_image(img,cam_max_range):
+    # [W,H,C]
+    img[img < -cam_max_range] = -cam_max_range
+    img = -torch.abs(img/(img.min() + 1e-4)) + 1
+    return img
 
 @torch.jit.script
 def compute_reward(
@@ -367,16 +461,6 @@ def compute_reward(
 
     # reset targets
     targets = torch.where(reset_conds,1,targets)
-
-    """
-    print(pose_reward)
-    print(vel_reward)
-    print(ang_reward)
-    print(ang_vel_reward)
-    print(-contact_cost)
-    print(total_reward)
-    print()
-    """
 
     ## TODO
     # - add power usage terms

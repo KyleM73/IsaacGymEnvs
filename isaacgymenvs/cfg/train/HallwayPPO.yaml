@@ -41,7 +41,7 @@ params:
     env_name: rlgpu
     multi_gpu: ${....multi_gpu}
     mixed_precision: True
-    normalize_input: False
+    normalize_input: True
     normalize_value: True
     value_bootstrap: True
     num_actors: ${....task.env.numEnvs}
@@ -54,7 +54,7 @@ params:
     lr_schedule: adaptive
     kl_threshold: 0.008
     score_to_win: 20000
-    max_epochs: ${resolve_default:500,${....max_iterations}}
+    max_epochs: ${resolve_default:5000,${....max_iterations}}
     save_best_after: 200
     save_frequency: 100
     print_stats: True
