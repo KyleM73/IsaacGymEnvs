@@ -8,7 +8,7 @@ params:
     name: continuous_a2c_logstd
 
   network:
-    name: multi_input_net
+    name: multi_input_net_replay
     separate: False
 
     space:
@@ -76,7 +76,7 @@ params:
     learning_rate: 5e-4
     lr_schedule: adaptive
     kl_threshold: 0.008
-    score_to_win: 20000
+    score_to_win: 1500
     max_epochs: ${resolve_default:2000,${....max_iterations}}
     save_best_after: 200
     save_frequency: 100
@@ -87,7 +87,7 @@ params:
     ppo: True
     e_clip: 0.2
     horizon_length: 32 # horizon_length * num_actors * num_agent
-    minibatch_size: 4096  # need batchsize % minibatch size == 0
+    minibatch_size: 16384 #4096  # need batchsize % minibatch size == 0
     mini_epochs: 5
     critic_coef: 4
     clip_value: True

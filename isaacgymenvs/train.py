@@ -111,14 +111,14 @@ def launch_rlg_hydra(cfg: DictConfig):
             cfg,
             **kwargs,
         )
-        if cfg.capture_video:
-            envs.is_vector_env = True
-            envs = gym.wrappers.RecordVideo(
-                envs,
-                f"videos/{run_name}",
-                step_trigger=lambda step: step % cfg.capture_video_freq == 0,
-                video_length=cfg.capture_video_len,
-            )
+        # if cfg.capture_video:
+        #     envs.is_vector_env = True
+        #     envs = gym.wrappers.RecordVideo(
+        #         envs,
+        #         f"videos/{run_name}",
+        #         step_trigger=lambda step: step % cfg.capture_video_freq == 0,
+        #         video_length=cfg.capture_video_len,
+        #     )
         return envs
 
     # register the rl-games adapter to use inside the runner

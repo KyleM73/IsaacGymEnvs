@@ -42,12 +42,13 @@ multi_gpu: False
 wandb_activate: False
 wandb_group: ''
 wandb_name: ${train.params.config.name}
-wandb_entity: ''
+wandb_entity: 'HCRL'
 wandb_project: 'isaacgymenvs'
+
 capture_video: False
-capture_video_freq: 1464
+capture_video_freq: 1000
 capture_video_len: 100
-force_render: True
+force_render: True #DO NOT CHANGE
 
 # disables rendering
 headless: False
