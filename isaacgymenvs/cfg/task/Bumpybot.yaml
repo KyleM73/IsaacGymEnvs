@@ -18,7 +18,7 @@ env:
   goalRadius: 0.1
 
   # cost parameters
-  rewardScale: 0.1
+  rewardScale: 1
   actionsCost: 1
   poseCost: 1
   angCost: 10
@@ -66,6 +66,7 @@ image:
   depth: 1
   range: 10
   updateFreq: 10 #Hz
+  fixCamera: False
 
 viewer:
   pos: [-5.0, 10.0, 12.0]

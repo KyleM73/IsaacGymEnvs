@@ -46,7 +46,7 @@ params:
           padding: 0
 
     mlp:
-      units: [200, 100, 50]
+      units: [128, 64, 32]
       activation: elu
       d2rl: False
 

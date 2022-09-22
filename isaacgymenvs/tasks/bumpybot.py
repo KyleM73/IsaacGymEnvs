@@ -53,7 +53,10 @@ class Bumpybot(VecTask):
             self.img_d = 3
         self.cam_max_range = self.cfg["image"]["range"]
         self.update_freq = self.cfg["image"]["updateFreq"]
-
+        if self.cfg["image"]["fixCamera"]:
+            self.camera_mode = gymapi.FOLLOW_POSITION
+        else:
+            self.camera_mode = gymapi.FOLLOW_TRANSFORM
         self.record = self.cfg["viewer"]["captureVideo"]
         self.record_freq = self.cfg["viewer"]["captureVideoFreq"]
 
@@ -128,6 +131,10 @@ class Bumpybot(VecTask):
         self.init_img_tensor = self.img_tensor.clone()
                 
     def _set_fig(self):
+        try:
+            plt.close("all")
+        except:
+            pass
         self.fig,self.ax = plt.subplots()
         self.fig.subplots_adjust(left=0,bottom=0,right=1,top=1,wspace=None,hspace=None)
         self.ax.set_axis_off()
@@ -263,7 +270,7 @@ class Bumpybot(VecTask):
 
         camera_pose = gymapi.Transform()
         camera_pose.p = gymapi.Vec3(0,0.25,0.3) # get real values from robot
-        camera_pose.r = gymapi.Quat.from_euler_zyx(0, 0, 0)
+        camera_pose.r = gymapi.Quat.from_euler_zyx(0, 0, np.pi/2)
 
         if self.test and self.cfg["env"]["path"]["showPath"]:
             path_path = env_c.path2urdf(self.path,occ_root)
@@ -303,7 +310,7 @@ class Bumpybot(VecTask):
             walls_handle = self.gym.create_actor(env, walls, walls_pose, "walls", i) # take this out of loop and use  -1 as last arg so all actors can collide with same walls
             camera_handle = self.gym.create_camera_sensor(env, camera_props)
 
-            self.gym.attach_camera_to_body(camera_handle, env, handle, camera_pose, gymapi.FOLLOW_TRANSFORM) #gymapi.FOLLOW_TRANSFORM,gymapi.FOLLOW_POSITION doesnt rotate with robot
+            self.gym.attach_camera_to_body(camera_handle, env, handle, camera_pose, self.camera_mode) #gymapi.FOLLOW_TRANSFORM,gymapi.FOLLOW_POSITION doesnt rotate with robot
 
             human_handles_inner = []
             for h in range(self.num_humans):
@@ -596,7 +603,7 @@ def compute_reward(
     total_reward /= 6 #normalize to 1
     total_reward *= reward_scale
     #max reward = reward_scale * steps * 1 + len(path) * 100
-    
+
     # terminal costs
     total_reward = torch.where(pose <= goal_radius, total_reward + goal_bonus, total_reward)
 
