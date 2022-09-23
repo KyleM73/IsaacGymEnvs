@@ -21,6 +21,8 @@ INSTALL_REQUIRES = [
     "hydra-core>=1.1",
     #"rl-games==1.5.2", #satisfied by local forked submodule
     "pyvirtualdisplay",
+    "rl_games",
+    "EnvCreator"
     ]
 
 
@@ -37,7 +39,7 @@ setup(
     install_requires=INSTALL_REQUIRES,
     packages=find_packages("."),
     classifiers=["Natural Language :: English", "Programming Language :: Python :: 3.7, 3.8"],
-    zip_safe=False,
+    zip_safe=False
 )
 
 # EOF
