@@ -39,7 +39,7 @@ class Bumpybot(VecTask):
         self.contact_lim = self.cfg["env"]["contactLimit"]
         self.death_cost = self.cfg["env"]["deathCost"]
         self.reward_scale = self.cfg["env"]["rewardScale"]
-        
+
         self.force_scale = self.cfg["env"]["forceScale"]
         self.torque_scale = self.cfg["env"]["torqueScale"]
 
@@ -77,11 +77,11 @@ class Bumpybot(VecTask):
 
         self.max_episode_length = self.cfg["env"]["episodeLength"]
 
-        self.cfg["env"]["numObservations"] = 8
+        self.cfg["env"]["numObservations"] = 10
         self.cfg["env"]["numActions"] = 3
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
-        
+
         self.img_obs_space = spaces.Box(low=0,high=1,shape=(self.img_w,self.img_h,self.img_d))
         self.vec_obs_space = self.obs_space
         self.obs_space = spaces.Dict(
@@ -129,7 +129,7 @@ class Bumpybot(VecTask):
 
         self._get_images()
         self.init_img_tensor = self.img_tensor.clone()
-                
+
     def _set_fig(self):
         try:
             plt.close("all")
@@ -180,7 +180,7 @@ class Bumpybot(VecTask):
             asset_file = self.cfg["env"]["asset"].get("assetFileName", asset_file)
             occ_file = self.cfg["env"]["asset"].get("occupancyFileName", occ_file)
             human_file = self.cfg["env"]["asset"].get("humanFileName", human_file)
-        
+
         asset_path = os.path.join(asset_root, asset_file)
         asset_root = os.path.dirname(asset_path)
         asset_file = os.path.basename(asset_path)
@@ -229,7 +229,7 @@ class Bumpybot(VecTask):
         asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         asset_bodies = self.gym.get_asset_rigid_body_count(asset)
         self.num_assets += 1
-        
+
         #base_idx = self.gym.find_asset_rigid_body_index(asset, "base")
         #sensor_pose = gymapi.Transform(gymapi.Vec3(0.0, 0.0, 0.0))
         #sensor_props = gymapi.ForceSensorProperties()
@@ -576,19 +576,19 @@ def compute_reward(
     ):
     # type: (Tensor, Tensor, Tensor, float, float, float, float, float, float, float, float, Tensor, float, float, float, Tensor, Tensor, Tensor, float) -> Tuple[Tensor, Tensor, Tensor, Tensor]
 
-    actions = torch.linalg.norm(obs_buf[:, 5:],dim=-1)
+    actions = torch.linalg.norm(obs_buf[:, 7:],dim=-1)
     actions_reward = rew_func(actions,actions_cost_scale)
 
     pose = torch.linalg.norm(obs_buf[:, :2],dim=-1)
     pose_reward = rew_func(pose,pose_cost_scale)
 
-    vel = torch.abs(obs_buf[:, 2])
+    vel = torch.abs(obs_buf[:, 4])
     vel_reward = rew_func(vel,velocity_cost_scale)
 
-    ang = torch.abs(obs_buf[:, 3])
+    ang = torch.abs(obs_buf[:, 5])
     ang_reward = rew_func(ang,ang_cost_scale)
 
-    ang_vel = torch.abs(obs_buf[:, 4])
+    ang_vel = torch.abs(obs_buf[:, 6])
     ang_vel_reward = rew_func(ang_vel,ang_velocity_cost_scale)
 
     contact = torch.linalg.norm(contact_forces,dim=-1)
@@ -632,7 +632,7 @@ def compute_reward(
     #if torch.any(contact > 1e-5):
     #    print()
     #    print()
-        
+
     ## TODO
     # - add power usage terms
     # - timeout bootstrapping (see ETH parallel walking paper)
@@ -664,20 +664,24 @@ def compute_observations(
     _,_,yaw = get_euler_xyz(rotation)
     heading = normalize_angle(yaw).unsqueeze(-1)
 
-    dot_prod = torch.einsum('ij,ij->i',position[:, :2],path[targets+1]) #look at next waypoint
-    dot_prod /= torch.linalg.norm(position[:, :2]+1e-7,dim=-1)
-    dot_prod /= torch.linalg.norm(path[targets+1]+1e-7,dim=-1)
+    next_pose_error = position[:, :2] - path[targets+1]
+    xaxis = torch.zeros_like(next_pose_error)
+    xaxis[:,0] = 1
+
+    #dot_prod = torch.einsum('ij,ij->i',position[:, :2],path[targets+1]) #look at next waypoint
+    dot_prod = torch.einsum('ij,ij->i',next_pose_error,xaxis)
+    dot_prod /= torch.linalg.norm(next_pose_error+1e-7,dim=-1)
+    dot_prod /= torch.linalg.norm(xaxis+1e-7,dim=-1)
     dot_prod = torch.clamp(dot_prod,-1+1e-7,1-1e-7)
     target_angs = torch.arccos(dot_prod).view(-1,1)
-
     heading_err = heading - target_angs
 
     vel_error = torch.linalg.norm(velocity[:,:2],dim=-1).view(-1,1) - goal_vel #[1]
 
     ang_vel_error = torch.linalg.norm(ang_velocity[:,2],dim=-1) - goal_ang_vel #[1]
 
-    # obs_buf shapes: 2, 1, 1, 1, num_acts(3)
-    obs = torch.cat((pose_error,vel_error,
-        heading_err,ang_vel_error,actions),dim=-1) #8
+    # obs_buf shapes: 2, 2, 1, 1, 1, num_acts(3)
+    obs = torch.cat((pose_error,velocity[:, :2],vel_error,
+        heading_err,ang_vel_error,actions),dim=-1) #10
 
     return obs

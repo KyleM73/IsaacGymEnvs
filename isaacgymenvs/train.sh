@@ -1,11 +1,11 @@
 #!/bin/sh
 
-numHumans=2
-epochs=8000
-epochs_humans=5000
+numHumans=3
+epochs=10000
+#epochs_humans=5000
 saveVideo=True
 checkpoint=runs/Bumpybot/nn/Bumpybot.pth
-experimentName=Bumpybot
+experimentName=Bumpybot_long
 
 for arg in $@
 do
@@ -15,25 +15,12 @@ done
 echo "Begin Training"
 echo "Experiment:" $experimentName
 
-## PHASE 1
-python train.py task=Bumpybot headless=True task.env.asset.numHumans=0 train.params.config.max_epochs=$epochs task.viewer.captureVideo=$saveVideo experiment=$experimentName task.image.fixCamera=True 
+#python train.py task=Bumpybot headless=True task.env.asset.numHumans=$numHumans train.params.config.max_epochs=$epochs task.viewer.captureVideo=$saveVideo experiment=$experimentName task.image.fixCamera=True #checkpoint=$checkpoint
 
-## CLEAR MEMORY
-#python clear_mem.py
+viddir=$(ls -t runs/Bumpybot/videos/| head -1)
 
-## PHASE 2
-#python train.py task=Bumpybot headless=True task.env.asset.numHumans=0 train.params.config.max_epochs=$epochs task.viewer.captureVideo=$saveVideo experiment=$experimentName task.image.fixCamera=False
-
-## CLEAR MEMORY
-#python clear_mem.py
-
-## PHASE 3
-#python train.py task=Bumpybot headless=True checkpoint=$checkpoint task.env.asset.numHumans=$numHumans train.params.config.max_epochs=$epochs_humans task.viewer.captureVideo=$saveVideo experiment=$experimentName
+#cp -r ./runs/Bumpybot/videos/$viddir ~/Dropbox/UT/Videos/
 
 echo "Training Complete."
-
-## TEST
-
-#./test.sh
 
 
