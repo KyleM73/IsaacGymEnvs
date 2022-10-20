@@ -52,7 +52,7 @@ params:
       activation: elu
 
     mlp:
-      units: [256, 128, 64]
+      units: [128, 64, 32]
       activation: elu
       d2rl: False
 
@@ -83,7 +83,7 @@ params:
     lr_schedule: adaptive
     kl_threshold: 0.008
     score_to_win: 2000
-    max_epochs: ${resolve_default:2000,${....max_iterations}}
+    max_epochs: ${resolve_default:200,${....max_iterations}}
     save_best_after: 100
     save_frequency: 100
     print_stats: True

@@ -1,12 +1,12 @@
 #!/bin/sh
 
-numEnvs=16
-numHumans=3
+numEnvs=1
+numHumans=0
 miniBatch=32
 saveVideo=True
-headless=False
-experimentName=Bumpybot_long
-checkpoint=runs/Bumpybot_long/nn/Bumpybot_long.pth #session2a.pth
+headless=True
+experimentName=Bumpybot_remote
+checkpoint=runs/Bumpybot_remote/nn/Bumpybot_remote.pth #session2a.pth
 
 for arg in $@
 do
@@ -19,6 +19,6 @@ python train.py test=True task=Bumpybot headless=$headless task.env.asset.numHum
 #then
 #	echo "hi"
 viddir=$(ls -t runs/Bumpybot/videos/| head -1)
-echo $viddir
-cp -r ./runs/Bumpybot/videos/$viddir ~/Dropbox/UT/Videos/
+#echo $viddir
+cp -r ./runs/Bumpybot/videos/$viddir ~/Dropbox/UT/Experiments/
 #fi

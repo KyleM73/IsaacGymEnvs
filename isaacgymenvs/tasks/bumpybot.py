@@ -5,6 +5,7 @@ from gym import spaces
 
 import numpy as np
 import os
+import sys
 import torch
 import imageio
 import matplotlib.pyplot as plt
@@ -20,6 +21,7 @@ from isaacgym.torch_utils import *
 from isaacgymenvs.utils.torch_jit_utils import *
 from isaacgymenvs.utils.waypoint_checker import *
 from isaacgymenvs.utils.np_formatting import *
+from isaacgymenvs.utils.img_utils import rgba2rgb
 from isaacgymenvs.tasks.base.vec_task import VecTask
 
 class Bumpybot(VecTask):
@@ -29,7 +31,7 @@ class Bumpybot(VecTask):
 
         self.dt = self.cfg["sim"]["dt"]
         self.test = self.cfg["sim"]["test"]
-
+        
         self.actions_cost_scale = self.cfg["env"]["actionsCost"]
         self.pose_cost_scale = self.cfg["env"]["poseCost"]
         self.ang_cost_scale = self.cfg["env"]["angCost"]
@@ -50,7 +52,7 @@ class Bumpybot(VecTask):
             self.img_type = gymapi.IMAGE_DEPTH
         else:
             self.img_type = gymapi.IMAGE_COLOR
-            self.img_d = 3
+            self.img_d >= 3
         self.cam_max_range = self.cfg["image"]["range"]
         self.update_freq = self.cfg["image"]["updateFreq"]
         if self.cfg["image"]["fixCamera"]:
@@ -59,14 +61,24 @@ class Bumpybot(VecTask):
             self.camera_mode = gymapi.FOLLOW_TRANSFORM
         self.record = self.cfg["viewer"]["captureVideo"]
         self.record_freq = self.cfg["viewer"]["captureVideoFreq"]
+        self.record_once = self.cfg["viewer"]["captureOnce"]
+        if not self.test: self.record_once =  False
+        self.rgb_h = self.cfg["viewer"]["height"]
+        self.rgb_w = self.cfg["viewer"]["width"]
 
         if self.record:
             self._set_fig()
             self.fps = int((self.dt * self.update_freq)**-1)
+            if self.test:
+                self.fps *= 2
             self.resets = -1
-            self.writer = animation.FFMpegWriter(fps=self.fps)
-            self.date = datetime.datetime.now().strftime("%m_%d_%Y-%H_%M")
-            self.video_dir = "runs/{name}/videos/{date}".format(name=self.cfg["name"],date=self.date)
+            self.writer = animation.FFMpegWriter(fps=self.fps) 
+            vdir = self.cfg["videoDir"]
+            if vdir is "":
+                self.date = datetime.datetime.now().strftime("%m_%d_%Y-%H_%M")
+                self.video_dir = "runs/{name}/videos/{date}_{name}".format(name=self.cfg["name"],date=self.date)
+            else:
+                self.video_dir = "runs/{name}/videos/{dir}".format(name=self.cfg["name"],dir=vdir)
             if not os.path.exists(self.video_dir):
                 os.makedirs(self.video_dir)
 
@@ -139,6 +151,136 @@ class Bumpybot(VecTask):
         self.fig.subplots_adjust(left=0,bottom=0,right=1,top=1,wspace=None,hspace=None)
         self.ax.set_axis_off()
         self.frames = []
+
+        self.fig_rgb,self.ax_rgb = plt.subplots()
+        self.fig_rgb.subplots_adjust(left=0,bottom=0,right=1,top=1,wspace=None,hspace=None)
+        self.ax_rgb.set_axis_off()
+        self.frames_rgb = []
+
+        self.fig_q,self.ax_q = plt.subplots(3,1)
+        self.fig_qdot,self.ax_qdot = plt.subplots(3,1)
+        self.fig_qddot,self.ax_qddot = plt.subplots(3,1)
+        self.fig_err,self.ax_err = plt.subplots(5,1)
+        self.x_hist,self.y_hist,self.th_hist = [],[],[]
+        self.vx_hist,self.vy_hist,self.vth_hist = [],[],[]
+        self.ax_hist,self.ay_hist,self.ath_hist = [],[],[]
+        self.xerr_hist,self.yerr_hist,self.therr_hist,self.verr_hist,self.vtherr_hist = [],[],[],[],[]
+
+    def _fill_fig(self):
+        #from root state 
+        self.x_hist.append(self.root_tensor[0,0].cpu())
+        self.y_hist.append(self.root_tensor[0,1].cpu())
+        rotation = self.root_tensor[::self.num_assets,3:7].cpu()
+        _,_,yaw = get_euler_xyz(rotation)
+        heading = normalize_angle(yaw).unsqueeze(-1)
+        self.th_hist.append(heading[0])
+        self.vx_hist.append(self.root_tensor[0,7].cpu())
+        self.vy_hist.append(self.root_tensor[0,8].cpu())
+        self.vth_hist.append(self.root_tensor[0,12].cpu())
+
+        #from actions
+        self.ax_hist.append(self.actions[0,0])
+        self.ay_hist.append(self.actions[0,1])
+        self.ath_hist.append(self.actions[0,2])
+
+        #from obs
+        self.xerr_hist.append(self.obs_buf[0,0].cpu())
+        self.yerr_hist.append(self.obs_buf[0,1].cpu())
+        self.therr_hist.append(self.obs_buf[0,5].cpu())
+        self.verr_hist.append(self.obs_buf[0,4].cpu())
+        self.vtherr_hist.append(self.obs_buf[0,6].cpu())
+
+    def _make_plots(self,label):
+        assert isinstance(label,str)
+        t = [i for i in range(len(self.x_hist))]
+
+        #fix t0 error
+        self.x_hist[0] = self.x_hist[1]
+        self.y_hist[0] = self.y_hist[1]
+        self.th_hist[0] = self.th_hist[1]
+        self.vx_hist[0] = self.vx_hist[1]
+        self.vy_hist[0] = self.vy_hist[1]
+        self.vth_hist[0] = self.vth_hist[1]
+        self.ax_hist[0] = self.ax_hist[1]
+        self.ay_hist[0] = self.ay_hist[1]
+        self.ath_hist[0] = self.ath_hist[1]
+        self.xerr_hist[0] = self.xerr_hist[1]
+        self.yerr_hist[0] = self.yerr_hist[1]
+        self.therr_hist[0] = self.therr_hist[1]
+        self.verr_hist[0] = self.verr_hist[1]
+        self.vtherr_hist[0] = self.vtherr_hist[1]
+
+        self.ax_q[0].plot(t,self.x_hist,label="x")
+        self.ax_q[0].set_ylabel("x")
+        self.ax_q[0].set_xticks([])
+        self.ax_q[1].plot(t,self.y_hist,label="y")
+        self.ax_q[1].set_ylabel("y")
+        self.ax_q[1].set_xticks([])
+        self.ax_q[2].plot(t,self.th_hist,label="th")
+        self.ax_q[2].set_ylabel("th")
+        self.ax_q[2].set_xlabel("steps")
+        self.fig_q.suptitle("Pose",fontsize=16)
+        if label == "train":
+            q_fname = "{dir}/train_reset{reset}/pose.png".format(dir=self.video_dir,reset=self.resets)
+        else:
+            q_fname = "{dir}/test/pose.png".format(dir=self.video_dir,reset=self.resets)
+        self.fig_q.savefig(q_fname)
+
+        self.ax_qdot[0].plot(t,self.vx_hist,label="vx")
+        self.ax_qdot[0].set_ylabel("vx")
+        self.ax_qdot[0].set_xticks([])
+        self.ax_qdot[1].plot(t,self.vy_hist,label="vy")
+        self.ax_qdot[1].set_ylabel("vy")
+        self.ax_qdot[1].set_xticks([])
+        self.ax_qdot[2].plot(t,self.vth_hist,label="vth")
+        self.ax_qdot[2].set_ylabel("vth")
+        self.ax_qdot[2].set_xlabel("steps")
+        self.fig_qdot.suptitle("Velocity",fontsize=16)
+        if label == "train":
+            qdot_fname = "{dir}/train_reset{reset}/velocity.png".format(dir=self.video_dir,reset=self.resets)
+        else:
+            qdot_fname = "{dir}/test/velocity.png".format(dir=self.video_dir,reset=self.resets)
+        self.fig_qdot.savefig(qdot_fname)
+
+        self.ax_qddot[0].plot(t,self.ax_hist,label="ax")
+        self.ax_qddot[0].set_ylabel("ax")
+        self.ax_qddot[0].set_xticks([])
+        self.ax_qddot[1].plot(t,self.ay_hist,label="ay")
+        self.ax_qddot[1].set_ylabel("ay")
+        self.ax_qddot[1].set_xticks([])
+        self.ax_qddot[2].plot(t,self.ath_hist,label="ath")
+        self.ax_qddot[2].set_ylabel("ath")
+        self.ax_qddot[2].set_xlabel("steps")
+        self.fig_qddot.suptitle("Action",fontsize=16)
+        for ax in self.ax_qddot:
+            ax.set_ylim([-1.5,1.5])
+        if label == "train":
+            qddot_fname = "{dir}/train_reset{reset}/action.png".format(dir=self.video_dir,reset=self.resets)
+        else:
+            qddot_fname = "{dir}/test/action.png".format(dir=self.video_dir,reset=self.resets)
+        self.fig_qddot.savefig(qddot_fname)
+
+        self.ax_err[0].plot(t,self.xerr_hist,label="xerr")
+        self.ax_err[0].set_ylabel("x error")
+        self.ax_err[0].set_xticks([])
+        self.ax_err[1].plot(t,self.yerr_hist,label="yerr")
+        self.ax_err[1].set_ylabel("y error")
+        self.ax_err[1].set_xticks([])
+        self.ax_err[2].plot(t,self.therr_hist,label="therr")
+        self.ax_err[2].set_ylabel("th error")
+        self.ax_err[2].set_xticks([])
+        self.ax_err[3].plot(t,self.verr_hist,label="verr")
+        self.ax_err[3].set_ylabel("vel error")
+        self.ax_err[3].set_xticks([])
+        self.ax_err[4].plot(t,self.vtherr_hist,label="vtherr")
+        self.ax_err[4].set_ylabel("avel error")
+        self.ax_err[4].set_xlabel("steps")
+        self.fig_err.suptitle("Error",fontsize=16)
+        if label == "train":
+            err_fname = "{dir}/train_reset{reset}/error.png".format(dir=self.video_dir,reset=self.resets)
+        else:
+            err_fname = "{dir}/test/error.png".format(dir=self.video_dir,reset=self.resets)
+        self.fig_err.savefig(err_fname)   
 
     def create_sim(self):
         # implement sim set up and environment creation here
@@ -303,6 +445,13 @@ class Bumpybot(VecTask):
             self.rng = np.random.default_rng()
             human_idx = self.rng.integers(low=0,high=self.num_human_samples,size=self.num_envs)
 
+        if self.record:
+            camera_props_rgb = gymapi.CameraProperties()
+            camera_props_rgb.width = self.rgb_w #self.img_w
+            camera_props_rgb.height = self.rgb_h #self.img_h
+            camera_props_rgb.use_collision_geometry = False
+            camera_props_rgb.enable_tensors = True
+
         for i in range(self.num_envs):
             # create env instance
             env = self.gym.create_env(self.sim, lower, upper, num_per_row)
@@ -327,7 +476,6 @@ class Bumpybot(VecTask):
                 #    props_shape[b].filter = b
                 #self.gym.set_actor_rigid_shape_properties(env, human_handle, props_shape)
 
-
             self.envs.append(env)
             self.handles.append(handle)
             self.wall_handles.append(walls_handle)
@@ -337,6 +485,17 @@ class Bumpybot(VecTask):
             cam_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, env, camera_handle, self.img_type)
             torch_cam_tensor = gymtorch.wrap_tensor(cam_tensor)
             self.cam_tensors.append(torch_cam_tensor)
+
+            if i==0 and self.record:
+                camera_handle_rgb = self.gym.create_camera_sensor(env, camera_props_rgb)
+                self.gym.set_camera_location(
+                        camera_handle_rgb, 
+                        env, 
+                        gymapi.Vec3(*self.cfg["viewer"]["pos"]),
+                        gymapi.Vec3(*self.cfg["viewer"]["target"]))
+
+                cam_tensor_rgb = self.gym.get_camera_image_gpu_tensor(self.sim,env, camera_handle_rgb, gymapi.IMAGE_COLOR)
+                self.torch_cam_tensor_rgb = gymtorch.wrap_tensor(cam_tensor_rgb)
 
             props_shape = self.gym.get_actor_rigid_shape_properties(env, handle)
             props_shape[0].rolling_friction = 0.0
@@ -348,6 +507,8 @@ class Bumpybot(VecTask):
             if self.test and self.cfg["env"]["path"]["showPath"]:
                 self.gym.create_actor(env, path, path_pose, "path", i)
 
+        #self.cam_tensors.append(torch_cam_tensor_rgb)
+
         self.mass = self.gym.get_actor_rigid_body_properties(env,handle)[0].mass
 
     def allocate_buffers(self):
@@ -356,7 +517,7 @@ class Bumpybot(VecTask):
         self.frames_in_contact = torch.zeros_like(self.progress_buf,device=self.device)
 
     def _get_images(self):
-        if self.steps % self.update_freq:
+        if self.steps % self.update_freq and not self.test:
             return
         #img_dir = "tmp_imgs"
         #if not os.path.exists(img_dir):
@@ -366,14 +527,17 @@ class Bumpybot(VecTask):
         self.gym.render_all_camera_sensors(self.sim)
         self.gym.start_access_image_tensors(self.sim)
         for i in range(self.num_envs):
-            img = self.cam_tensors[i].view(self.img_w,self.img_h,self.img_d)
+            img = self.cam_tensors[i].view(self.img_h,self.img_w,self.img_d)
             self.img_tensor[i,...] = self._normalize_image(img)
             #fname = os.path.join(img_dir, "cam-%04d.png" % i)
             #imageio.imwrite(fname, 255*self._normalize_image(img).cpu().numpy())
-        self.gym.end_access_image_tensors(self.sim)
-
-        if self.record and not self.resets % self.record_freq:
+        if self.record and not self.resets % self.record_freq: 
             self.frames.append([self.ax.imshow(255*self.img_tensor[0,...].cpu().numpy(),animated=True,cmap="gray")])
+
+            img_rgb = self.torch_cam_tensor_rgb.view(self.rgb_h,self.rgb_w,4).cpu().numpy()
+            self.frames_rgb.append([self.ax_rgb.imshow(img_rgb,animated=True)])
+       
+        self.gym.end_access_image_tensors(self.sim)            
 
     def _normalize_image(self,img):
         return normalize_image(img,self.cam_max_range)
@@ -425,6 +589,9 @@ class Bumpybot(VecTask):
             self.actions,
             self.num_assets
             )
+        
+        if self.record and not self.resets % self.record_freq:
+            self._fill_fig()
 
     def reset_idx(self, env_ids):
 
@@ -473,18 +640,46 @@ class Bumpybot(VecTask):
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         if len(env_ids) > 0:
             self.reset_idx(env_ids)
-
+            
+            rgb_flag = False
             if self.record and 0 in env_ids:
+                if len(self.frames_rgb) > 1:
+                    if self.test:
+                        rgb_vdir = "{dir}/test".format(dir=self.video_dir)
+                        if not os.path.exists(rgb_vdir):
+                            os.makedirs(rgb_vdir)
+                        rgb_vname = "{dir}/rgb.mp4".format(dir=rgb_vdir)
+                    else:
+                        rgb_vdir = "{dir}/train_reset{reset}".format(dir=self.video_dir,reset=self.resets)
+                        if not os.path.exists(rgb_vdir):
+                            os.makedirs(rgb_vdir)
+                        rgb_vname = "{dir}/rgb.mp4".format(dir=rgb_vdir)
+
+                    ani_rgb = animation.ArtistAnimation(self.fig_rgb,self.frames_rgb,interval=int(1000/self.fps),blit=True,repeat=False)
+                    ani_rgb.save(rgb_vname,writer=self.writer)
+                    rgb_flag = True
                 if len(self.frames) > 1:
                     if self.test:
-                        self.vname = "{dir}/{name}_test.mp4".format(dir=self.video_dir,name=self.cfg["name"])
+                        vdir = "{dir}/test".format(dir=self.video_dir)
+                        if not os.path.exists(vdir):
+                            os.makdirs(vdir)
+                        vname = "{dir}/depth.mp4".format(dir=vdir)
+                        self._make_plots("test")
                         self.record = False
                     else:
-                        self.vname = "{dir}/{name}_train{reset}.mp4".format(dir=self.video_dir,name=self.cfg["name"],reset=self.resets)
+                        vdir = "{dir}/train_reset{reset}".format(dir=self.video_dir,reset=self.resets)
+                        if not os.path.exists(vdir):
+                            os.makdirs(vdir)
+                        vname = "{dir}/depth.mp4".format(dir=vdir)
+                        self._make_plots("train")
                     ani = animation.ArtistAnimation(self.fig,self.frames,interval=int(1000/self.fps),blit=True,repeat=False)
-                    ani.save(self.vname,writer=self.writer)
+                    ani.save(vname,writer=self.writer)
+                    
                     self._set_fig()
-                    self.frames = []
+                    
+                if rgb_flag and self.record_once:
+                    sys.exit("test simulation complete.")
+
                 self.resets += 1
 
         self._get_images()

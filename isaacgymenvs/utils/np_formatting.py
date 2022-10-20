@@ -5,3 +5,6 @@ def set_np_formatting():
     np.set_printoptions(edgeitems=1, infstr='inf',
                         linewidth=4000, nanstr='nan', precision=2,
                         suppress=False, threshold=100, formatter=None)
+
+def set_np_formatting_img():
+    np.set_printoptions(edgeitems=3,threshold=1000)

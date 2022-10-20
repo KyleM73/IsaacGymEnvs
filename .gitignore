@@ -33,4 +33,5 @@ outputs/
 */occupancy/*.urdf
 */occupancy/*.txt
 tmp_imgs/
+img_tmp/
 /.vim/

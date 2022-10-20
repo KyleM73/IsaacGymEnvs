@@ -3,11 +3,12 @@ name: Bumpybot
 
 physics_engine: ${..physics_engine}
 
+videoDir: ''
 # if given, will override the device setting in gym.
 env: 
   numEnvs: ${resolve_default:512,${...num_envs}}
   envSpacing: 3
-  episodeLength: 250
+  episodeLength: 350
   controlFrequencyInv: 5
   enableDebugVis: False
 
@@ -25,7 +26,7 @@ env:
   velocityCost: 1
   angularVelocityCost: 1
   contactCost: 10 #0.001
-  contactLimit: 100 #[N], ~25 lbs
+  contactLimit: 250 #[N], ~62.5 lbs
   deathCost: -100
   goalBonus: 100
 
@@ -39,7 +40,7 @@ env:
     occupancyFileName: "occupancy/hall.png"
     humanFileName: "urdf/human/human.urdf"
     #humanFileName: "urdf/block.urdf"
-    numHumans: 1
+    numHumans: 0
     numSamples: 512
     testIdx: 42
     setLoc: False
@@ -66,13 +67,16 @@ image:
   depth: 1
   range: 10
   updateFreq: 10 #Hz
-  fixCamera: False
+  fixCamera: True
 
 viewer:
-  pos: [-5.0, 10.0, 12.0]
-  target: [0.0, 10.0, 0.0]
-  captureVideo: False
-  captureVideoFreq: 20
+  height: 450
+  width: 800
+  pos: [-5.0, 9.0, 10.0]
+  target: [0.0, 9.0, 0.0]
+  captureVideo: True
+  captureOnce: True
+  captureVideoFreq: 10
 
 sim:
   test: ${...test}
