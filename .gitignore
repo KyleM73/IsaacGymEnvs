@@ -35,3 +35,4 @@ outputs/
 tmp_imgs/
 img_tmp/
 /.vim/
+*/tmp.sh

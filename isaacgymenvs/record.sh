@@ -1,81 +1,34 @@
-#!/bin/sh
+#!/bin/bash
 
 localdir=runs/Bumpybot/videos
 videodir=$(ls -t $localdir/| head -1)
-dropboxdir=~/Dropbox/UT/Experiments
+experimentName=$(ls -t ~/Dropbox/UT/Experiments/| head -1)
+dropboxdir=~/Dropbox/UT/Experiments/$experimentName
+numPhases=2
 
-echo recording from directory: $videodir
+for i in $(eval echo "{1..$numPhases}")
+do
+    echo recording from directory: $videodir
+    flag=1
 
-while true
-do  
-    cp -r $localdir/$videodir $dropboxdir
+    while [ $flag -eq 1 ]
+    do  
+        cp -r $localdir/$videodir $dropboxdir
 
-    if $([ -f $dropboxdir/$videodir/progress.txt ])
-    then
-        break
-    fi
+        if $([ -f $dropboxdir/$videodir/progress.txt ])
+        then
+            flag=0
+        fi
     
-    sleep 60
-done
+        sleep 60
+    done
 
-sleep 300
+    echo recording from directory $videodir complete.
 
-localdir=runs/Bumpybot/videos
-videodir=$(ls -t $localdir/| head -1)
-dropboxdir=~/Dropbox/UT/Experiments
+    sleep 300
 
-echo recording from directory: $videodir
+    videodir=$(ls -t $localdir/| head -1)
 
-while true
-do  
-    cp -r $localdir/$videodir $dropboxdir
-
-    if $([ -f $dropboxdir/$videodir/progress.txt ])
-    then
-        break
-    fi
-    
-    sleep 60
-done
-
-sleep 300
-
-localdir=runs/Bumpybot/videos
-videodir=$(ls -t $localdir/| head -1)
-dropboxdir=~/Dropbox/UT/Experiments
-
-echo recording from directory: $videodir
-
-while true
-do  
-    cp -r $localdir/$videodir $dropboxdir
-
-    if $([ -f $dropboxdir/$videodir/progress.txt ])
-    then
-        break
-    fi
-    
-    sleep 60
-done
-
-sleep 300
-
-localdir=runs/Bumpybot/videos
-videodir=$(ls -t $localdir/| head -1)
-dropboxdir=~/Dropbox/UT/Experiments
-
-echo recording from directory: $videodir
-
-while true
-do  
-    cp -r $localdir/$videodir $dropboxdir
-
-    if $([ -f $dropboxdir/$videodir/progress.txt ])
-    then
-        break
-    fi
-    
-    sleep 60
 done
 
 echo recording complete.

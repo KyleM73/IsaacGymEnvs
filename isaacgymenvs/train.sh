@@ -1,69 +1,61 @@
-#!/bin/sh
+#!/bin/bash
 
-experimentName=Bumpybot_dense
+experimentName=Bumpybot_line2
 checkpoint=runs/$experimentName/nn/$experimentName.pth
 progressFile=runs/Bumpybot/progress.txt
 
-#for arg in $@
-#do
-#	experimentName=$arg
-#done
+mkdir ~/Dropbox/UT/Experiments/$experimentName
 
 echo "Begin Training"
 echo "Experiment:" $experimentName
 
 ## PHASE 1 -- 0 Humans
-python train.py task=Bumpybot headless=True task.env.asset.numHumans=0 train.params.config.max_epochs=250 task.viewer.captureVideo=True experiment=$experimentName task.image.fixCamera=True
+python train.py task=Bumpybot headless=True task.env.asset.numHumans=0 train.params.config.max_epochs=500 experiment=$experimentName
+
+cp $checkpoint runs/$experimentName/nn/phase1.pth
 
 viddir=$(ls -t runs/Bumpybot/videos/| head -1)
 
-python train.py task=Bumpybot test=True headless=True task.env.asset.numHumans=0 task.viewer.captureVideo=True experiment=$experimentName task.image.fixCamera=True checkpoint=$checkpoint task.videoDir=$viddir num_envs=1 train.params.config.minibatch_size=32
+python train.py task=Bumpybot test=True headless=True task.env.asset.numHumans=0 experiment=$experimentName checkpoint=$checkpoint task.videoDir=$viddir num_envs=1 train.params.config.minibatch_size=32
 
-echo done > $progressFile
+echo phase 1: done > $progressFile
 
-dropboxdir=~/Dropbox/UT/Experiments/$viddir
+dropboxdir=~/Dropbox/UT/Experiments/$experimentName/$viddir
 
 cp $progressFile $dropboxdir 
 
-## PHASE 2 -- 1 Human
-python train.py task=Bumpybot headless=True task.env.asset.numHumans=1 train.params.config.max_epochs=500 task.viewer.captureVideo=True experiment=$experimentName task.image.fixCamera=True checkpoint=$checkpoint
+## PHASE 2 -- 4 Humans
+python train.py task=Bumpybot headless=True task.env.asset.numHumans=4 train.params.config.max_epochs=10000 experiment=$experimentName checkpoint=$checkpoint task.env.episodeLength=1000 num_envs=256 train.params.config.minibatch_size=8192
+
+cp $checkpoint runs/$experimentName/nn/phase2.pth
 
 viddir=$(ls -t runs/Bumpybot/videos/| head -1)
 
-python train.py task=Bumpybot test=True headless=True task.env.asset.numHumans=1 task.viewer.captureVideo=True experiment=$experimentName task.image.fixCamera=True checkpoint=$checkpoint task.videoDir=$viddir num_envs=1 train.params.config.minibatch_size=32
+python train.py task=Bumpybot test=True headless=True task.env.asset.numHumans=4 experiment=$experimentName checkpoint=$checkpoint task.videoDir=$viddir num_envs=1 train.params.config.minibatch_size=32 task.env.episodeLength=1000
 
-echo done > $progressFile
+echo phase 2: done >> $progressFile
 
-dropboxdir=~/Dropbox/UT/Experiments/$viddir
-
-cp $progressFile $dropboxdir 
-
-## PHASE 3 -- 2 Humans
-python train.py task=Bumpybot headless=True task.env.asset.numHumans=4 train.params.config.max_epochs=1500 task.viewer.captureVideo=True experiment=$experimentName task.image.fixCamera=True checkpoint=$checkpoint
-
-viddir=$(ls -t runs/Bumpybot/videos/| head -1)
-
-python train.py task=Bumpybot test=True headless=True task.env.asset.numHumans=4 task.viewer.captureVideo=True experiment=$experimentName task.image.fixCamera=True checkpoint=$checkpoint task.videoDir=$viddir num_envs=1 train.params.config.minibatch_size=32
-
-echo done > $progressFile
-
-dropboxdir=~/Dropbox/UT/Experiments/$viddir
+dropboxdir=~/Dropbox/UT/Experiments/$experimentName/$viddir
 
 cp $progressFile $dropboxdir 
 
-## PHASE 4 -- 3 Humans
-python train.py task=Bumpybot headless=True task.env.asset.numHumans=6 train.params.config.max_epochs=3000 task.viewer.captureVideo=True experiment=$experimentName task.image.fixCamera=True checkpoint=$checkpoint
+## PHASE 3 -- 10 Humans
+#python train.py task=Bumpybot headless=True task.env.asset.numHumans=10 train.params.config.max_epochs=4000 experiment=$experimentName checkpoint=$checkpoint task.env.episodeLength=1000 num_envs=256 train.params.config.minibatch_size=8192
 
-viddir=$(ls -t runs/Bumpybot/videos/| head -1)
+#cp $checkpoint runs/$experimentName/nn/phase3.pth
 
-python train.py task=Bumpybot test=True headless=True task.env.asset.numHumans=6 task.viewer.captureVideo=True experiment=$experimentName task.image.fixCamera=True checkpoint=$checkpoint task.videoDir=$viddir num_envs=1 train.params.config.minibatch_size=32
+#viddir=$(ls -t runs/Bumpybot/videos/| head -1)
 
+#python train.py task=Bumpybot test=True headless=True task.env.asset.numHumans=10 experiment=$experimentName checkpoint=$checkpoint task.videoDir=$viddir num_envs=1 train.params.config.minibatch_size=32 task.env.episodeLength=1000
 
-echo done > $progressFile
+#echo phase 3: done >> $progressFile
+#echo done > $progressFile
 
-dropboxdir=~/Dropbox/UT/Experiments/$viddir
+#dropboxdir=~/Dropbox/UT/Experiments/$experimentName/$viddir
 
-cp $progressFile $dropboxdir 
+#cp $progressFile $dropboxdir 
+
+cp ./train.sh ~/Dropbox/UT/Experiments/$experimentName
 
 echo "Training Complete."
 

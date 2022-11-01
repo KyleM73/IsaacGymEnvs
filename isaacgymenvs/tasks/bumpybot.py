@@ -31,6 +31,7 @@ class Bumpybot(VecTask):
 
         self.dt = self.cfg["sim"]["dt"]
         self.test = self.cfg["sim"]["test"]
+        self.set_location = self.cfg["env"]["asset"]["setLoc"]
         
         self.actions_cost_scale = self.cfg["env"]["actionsCost"]
         self.pose_cost_scale = self.cfg["env"]["poseCost"]
@@ -89,7 +90,7 @@ class Bumpybot(VecTask):
 
         self.max_episode_length = self.cfg["env"]["episodeLength"]
 
-        self.cfg["env"]["numObservations"] = 10
+        self.cfg["env"]["numObservations"] = 13
         self.cfg["env"]["numActions"] = 3
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
@@ -344,24 +345,42 @@ class Bumpybot(VecTask):
         filter_dist = self.cfg["env"]["path"]["filterDist"]
         self.path = env_c.get_path(start,target,filter_dist)
 
-        human_loc_data_path = occ_root+"/human_loc_data_"+os.path.basename(occ_path).split(".")[0]+".txt"
         self.num_humans = self.cfg["env"]["asset"]["numHumans"]
-        self.num_human_samples = self.cfg["env"]["asset"]["numSamples"]
-        if not os.path.exists(human_loc_data_path):
-            print("Generating human location data...")
-            self.loc_data = torch.tensor(env_c.generate_loc_data(start,target,self.num_humans,n=self.num_human_samples,output_dir=occ_root))
+        if self.set_location and self.num_humans > 0:
+            self.num_human_samples = 1
+            print("Using set human location data...")
+            locs = []
+            c = 0
+            for h in range(self.num_humans):
+                if h < 5:
+                    loc = [-1.5+0.5*h,5+0.1*h,0]
+                elif h < 10:
+                    loc = [1.5-0.5*(h-5),10+0.1*(h-5),0]
+                else:
+                    c += 1
+                locs.append(loc)
+            self.num_humans -= c
+
+            self.loc_data = torch.tensor(locs).view(self.num_human_samples,self.num_humans,3)
             print("Done.")
         else:
-            from ast import literal_eval
-            print("Retrieving human location data...")
-            with open(human_loc_data_path,"r") as f:
-                self.loc_data = torch.tensor([list(literal_eval(line)) for line in f])
-                if self.loc_data.size() != (self.num_human_samples,self.num_humans,3):
-                    if self.loc_data.size()[0] < self.num_human_samples or self.loc_data.size()[1] < self.num_humans:
-                        print("Retrieval failed.")
-                        print("Generating human location data...")
-                        self.loc_data = torch.tensor(env_c.generate_loc_data(start,target,self.num_humans,n=self.num_human_samples,output_dir=occ_root))
-            print("Done.")
+            human_loc_data_path = occ_root+"/human_loc_data_"+os.path.basename(occ_path).split(".")[0]+".txt"
+            self.num_human_samples = self.cfg["env"]["asset"]["numSamples"]
+            if not os.path.exists(human_loc_data_path):
+                print("Generating human location data...")
+                self.loc_data = torch.tensor(env_c.generate_loc_data(start,target,self.num_humans,n=self.num_human_samples,output_dir=occ_root))
+                print("Done.")
+            else:
+                from ast import literal_eval
+                print("Retrieving human location data...")
+                with open(human_loc_data_path,"r") as f:
+                    self.loc_data = torch.tensor([list(literal_eval(line)) for line in f])
+                    if self.loc_data.size() != (self.num_human_samples,self.num_humans,3):
+                        if self.loc_data.size()[0] < self.num_human_samples or self.loc_data.size()[1] < self.num_humans:
+                            print("Retrieval failed.")
+                            print("Generating human location data...")
+                            self.loc_data = torch.tensor(env_c.generate_loc_data(start,target,self.num_humans,n=self.num_human_samples,output_dir=occ_root))
+                print("Done.")
 
         self.num_assets = 0
 
@@ -439,7 +458,7 @@ class Bumpybot(VecTask):
         self.envs = []
         self.human_handles = []
 
-        if self.test and self.cfg["env"]["asset"]["setLoc"]:
+        if self.test and self.set_location:
             human_idx = self.cfg["env"]["asset"]["testIdx"]*np.ones(self.num_envs,dtype=int)
         else:
             self.rng = np.random.default_rng()
@@ -543,15 +562,6 @@ class Bumpybot(VecTask):
         return normalize_image(img,self.cam_max_range)
 
     def _compute_reward(self, actions):
-        self.contact_forces = get_contact_force(
-            self.root_tensor[::self.num_assets,7:9],
-            self.prev_root[::self.num_assets,7:9],
-            self.dt*self.control_freq_inv,
-            self.dt,
-            self.actions[:,:2],
-            self.mass
-            )
-
         self.rew_buf[:], self.reset_buf[:], self.targets[:], self.frames_in_contact[:] = compute_reward(
             self.obs_buf,
             self.reset_buf,
@@ -579,6 +589,15 @@ class Bumpybot(VecTask):
         #self.gym.refresh_force_sensor_tensor(self.sim)
         #self.gym.refresh_net_contact_force_tensor(self.sim)
 
+        self.contact_forces = get_contact_force(
+            self.root_tensor[::self.num_assets,7:9],
+            self.prev_root[::self.num_assets,7:9],
+            self.dt*self.control_freq_inv,
+            self.dt,
+            self.actions[:,:2],
+            self.mass
+            )
+
         self.obs_buf[:] = compute_observations(
             self.root_tensor,
             self.path,
@@ -587,7 +606,9 @@ class Bumpybot(VecTask):
             self.goal_ang_vel,
             self.dt,
             self.actions,
-            self.num_assets
+            self.num_assets,
+            self.contact_forces,
+            self.contact_lim
             )
         
         if self.record and not self.resets % self.record_freq:
@@ -771,7 +792,7 @@ def compute_reward(
     ):
     # type: (Tensor, Tensor, Tensor, float, float, float, float, float, float, float, float, Tensor, float, float, float, Tensor, Tensor, Tensor, float) -> Tuple[Tensor, Tensor, Tensor, Tensor]
 
-    actions = torch.linalg.norm(obs_buf[:, 7:],dim=-1)
+    actions = torch.linalg.norm(obs_buf[:, 10:],dim=-1)
     actions_reward = rew_func(actions,actions_cost_scale)
 
     pose = torch.linalg.norm(obs_buf[:, :2],dim=-1)
@@ -843,9 +864,11 @@ def compute_observations(
     goal_ang_vel,
     dt,
     actions,
-    num_bodies
+    num_bodies,
+    contact_forces,
+    contact_lim
     ):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, float, Tensor, int) -> Tensor
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, float, Tensor, int, Tensor, int) -> Tensor
 
     # x y th vx vy vth gx gy gth ang2target gv fx fy fth
 
@@ -875,8 +898,12 @@ def compute_observations(
 
     ang_vel_error = torch.linalg.norm(ang_velocity[:,2],dim=-1) - goal_ang_vel #[1]
 
-    # obs_buf shapes: 2, 2, 1, 1, 1, num_acts(3)
+    contact_norm = torch.linalg.norm(contact_forces,dim=-1).view((-1,1))
+    contact_scaled = contact_forces / (contact_norm + 1e-7)
+    contact_ratio = contact_norm / (contact_lim + 1e-7)
+
+    # obs_buf shapes: 2, 2, 1, 1, 1, 2, 1, num_acts(3)
     obs = torch.cat((pose_error,velocity[:, :2],vel_error,
-        heading_err,ang_vel_error,actions),dim=-1) #10
+        heading_err,ang_vel_error,contact_scaled,contact_ratio,actions),dim=-1) #13
 
     return obs

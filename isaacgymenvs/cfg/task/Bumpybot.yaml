@@ -8,7 +8,7 @@ videoDir: ''
 env: 
   numEnvs: ${resolve_default:512,${...num_envs}}
   envSpacing: 3
-  episodeLength: 350
+  episodeLength: 500
   controlFrequencyInv: 5
   enableDebugVis: False
 
@@ -24,8 +24,8 @@ env:
   poseCost: 1
   angCost: 10
   velocityCost: 1
-  angularVelocityCost: 1
-  contactCost: 10 #0.001
+  angularVelocityCost: 10
+  contactCost: 1 #0.001
   contactLimit: 250 #[N], ~62.5 lbs
   deathCost: -100
   goalBonus: 100
@@ -40,10 +40,10 @@ env:
     occupancyFileName: "occupancy/hall.png"
     humanFileName: "urdf/human/human.urdf"
     #humanFileName: "urdf/block.urdf"
-    numHumans: 0
+    numHumans: 4
     numSamples: 512
-    testIdx: 42
-    setLoc: False
+    testIdx: 0 #42
+    setLoc: True
     #occupancyFileName: "occupancy/easy_maze.png"
     #reflect: True
 
