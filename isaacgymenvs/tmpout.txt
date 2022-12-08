@@ -1,0 +1,344 @@
+mkdir: cannot create directory ‘/home/kylem/Dropbox/UT/Experiments/Hsr’: File exists
+Begin Training
+Experiment: Hsr
+train.py:49: UserWarning: 
+The version_base parameter is not specified.
+Please specify a compatability version level, or None.
+Will assume defaults for version 1.1
+  @hydra.main(config_name="config", config_path="./cfg")
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/defaults_list.py:251: UserWarning: In 'config': Defaults list is missing `_self_`. See https://hydra.cc/docs/upgrades/1.0_to_1.1/default_composition_order for more information
+  warnings.warn(msg, UserWarning)
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/defaults_list.py:415: UserWarning: In config: Invalid overriding of hydra/job_logging:
+Default list overrides requires 'override' keyword.
+See https://hydra.cc/docs/next/upgrades/1.0_to_1.1/defaults_list_override for more information.
+
+  deprecation_warning(msg)
+Importing module 'gym_38' (/home/kylem/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/kylem/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.12.1
+Device count 2
+/home/kylem/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Using /home/kylem/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/kylem/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/hydra.py:119: UserWarning: Future Hydra versions will no longer change working directory at job runtime by default.
+See https://hydra.cc/docs/next/upgrades/1.1_to_1.2/changes_to_job_working_dir/ for more information.
+  ret = run_job(
+ninja: no work to do.
+2022-11-15 00:47:52,294 - INFO - logger - logger initialized
+[Warning] [carb.gym.plugin] useGpu is set, forcing single scene (0 subscenes)
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+<unknown>:3: DeprecationWarning: invalid escape sequence \*
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/torch/utils/tensorboard/__init__.py:4: DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.
+  if not hasattr(tensorboard, "__version__") or LooseVersion(
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/gym/spaces/box.py:84: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+Loading extension module gymtorch...
+Error: FBX library failed to load - importing FBX data will not succeed. Message: No module named 'fbx'
+FBX tools must be installed from https://help.autodesk.com/view/FBX/2020/ENU/?guid=FBX_Developer_Help_scripting_with_python_fbx_installing_python_fbx_html
+task: 
+    name: HSR
+    physics_engine: physx
+    videoDir: 
+    env: 
+        numEnvs: 512
+        envSpacing: 3
+        episodeLength: 250
+        controlFrequencyInv: 5
+        enableDebugVis: False
+        clipActions: 1.0
+        velocityGoal: 0.22
+        angVelocityGoal: 0
+        goalRadius: 0.1
+        rewardScale: 1
+        actionsCost: 1
+        poseCost: 1
+        angCost: 1
+        velocityCost: 1
+        angularVelocityCost: 1
+        contactCost: 10
+        contactLimit: 250
+        deathCost: -100
+        goalBonus: 100
+        actionRandomization: 0.05
+        forceScale: 37
+        torqueScale: 3.42065
+        asset: 
+            assetFileName: urdf/hsr.urdf
+            occupancyFileName: occupancy/AHG_hall.png
+            humanFileName: urdf/human/human.urdf
+            numHumans: 0
+            numSamples: 512
+            testIdx: 0
+            setLoc: False
+        path: 
+            start: [0, 0]
+            target: [0, 5]
+            filterDist: 0.9
+            showPath: False
+        plane: 
+            staticFriction: 0.0
+            dynamicFriction: 0.0
+            restitution: 0.0
+        enableCameraSensors: True
+    image: 
+        height: 240
+        width: 240
+        depth: 1
+        range: 5
+        updateFreq: 10
+        fixCamera: True
+    viewer: 
+        height: 900
+        width: 1600
+        pos: [-5.0, 9.0, 10.0]
+        target: [0.0, 9.0, 0.0]
+        captureVideo: True
+        captureOnce: True
+        captureVideoFreq: 10
+    sim: 
+        test: False
+        dt: 0.01
+        substeps: 4
+        up_axis: z
+        use_gpu_pipeline: True
+        gravity: [0.0, 0.0, -9.81]
+        physx: 
+            num_threads: 4
+            solver_type: 1
+            use_gpu: True
+            num_position_iterations: 4
+            num_velocity_iterations: 0
+            contact_offset: 0.02
+            rest_offset: 0.0
+            bounce_threshold_velocity: 0.2
+            max_depenetration_velocity: 2.0
+            default_buffer_size_multiplier: 5.0
+            max_gpu_contact_pairs: 8388608
+            num_subscenes: 4
+            contact_collection: 2
+train: 
+    params: 
+        seed: 42
+        algo: 
+            name: a2c_continuous
+        model: 
+            name: continuous_a2c_logstd
+        network: 
+            name: multi_input_net_replay
+            separate: False
+            space: 
+                continuous: 
+                    mu_activation: None
+                    sigma_activation: None
+                    mu_init: 
+                        name: default
+                    sigma_init: 
+                        name: const_initializer
+                        val: 0
+                    fixed_sigma: True
+            linear_projection: 
+                shape: 16
+                activation: elu
+            cnn: 
+                type: conv2d
+                activation: elu
+                initializer: 
+                    name: default
+                regularizer: 
+                    name: None
+                convs: [{'filters': 8, 'kernel_size': 16, 'strides': 4, 'padding': 0}, {'filters': 16, 'kernel_size': 9, 'strides': 4, 'padding': 0}, {'filters': 32, 'kernel_size': 5, 'strides': 1, 'padding': 0}]
+            image_feature_encoder: 
+                shape: [256]
+                activation: elu
+            mlp: 
+                units: [256, 128, 64]
+                activation: elu
+                d2rl: False
+                initializer: 
+                    name: default
+                regularizer: 
+                    name: None
+        load_checkpoint: False
+        load_path: 
+        config: 
+            name: Hsr
+            full_experiment_name: Hsr
+            env_name: rlgpu
+            multi_gpu: False
+            mixed_precision: True
+            normalize_input: True
+            normalize_value: True
+            value_bootstrap: True
+            num_actors: 512
+            reward_shaper: 
+                scale_value: 0.01
+            normalize_advantage: True
+            gamma: 0.99
+            tau: 0.95
+            learning_rate: 0.0005
+            lr_schedule: adaptive
+            kl_threshold: 0.008
+            score_to_win: 650
+            max_epochs: 500
+            save_best_after: 100
+            save_frequency: 100
+            print_stats: True
+            grad_norm: 1.0
+            entropy_coef: 0.0
+            truncate_grads: True
+            ppo: True
+            e_clip: 0.2
+            horizon_length: 32
+            minibatch_size: 16384
+            mini_epochs: 5
+            critic_coef: 4
+            clip_value: True
+            seq_len: 4
+            bounds_loss_coef: 0.0001
+task_name: HSR
+experiment: Hsr
+num_envs: 
+seed: 42
+torch_deterministic: False
+max_iterations: 
+physics_engine: physx
+pipeline: gpu
+sim_device: cuda:0
+rl_device: cuda:0
+graphics_device_id: 0
+num_threads: 4
+solver_type: 1
+num_subscenes: 4
+test: False
+checkpoint: 
+multi_gpu: False
+wandb_activate: False
+wandb_group: 
+wandb_name: Hsr
+wandb_entity: HCRL
+wandb_project: isaacgymenvs
+capture_video: False
+capture_video_freq: 1000
+capture_video_len: 100
+force_render: True
+headless: True
+Setting seed: 42
+self.seed = 42
+Started to train
+Exact experiment name requested from command line: Hsr
+Solution found.
+Retrieving human location data...
+Done.
+Box(-1.0, 1.0, (2,), float32) Dict(img:Box(0.0, 1.0, (240, 240, 1), float32), vec:Box(-inf, inf, (10,), float32))
+current training device: cuda:0
+build mlp: 10
+conv_name: conv2d
+build mlp: 2592
+build mlp: 272
+RunningMeanStd:  (1,)
+RunningMeanStd:  (240, 240, 1)
+RunningMeanStd:  (10,)
+Error executing job with overrides: ['task=Hsr', 'headless=True', 'experiment=Hsr']
+Traceback (most recent call last):
+  File "train.py", line 167, in <module>
+    launch_rlg_hydra()
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/main.py", line 90, in decorated_main
+    _run_hydra(
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/utils.py", line 389, in _run_hydra
+    _run_app(
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/utils.py", line 452, in _run_app
+    run_and_report(
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/utils.py", line 216, in run_and_report
+    raise ex
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/utils.py", line 213, in run_and_report
+    return func()
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/utils.py", line 453, in <lambda>
+    lambda: hydra.run(
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/hydra.py", line 132, in run
+    _ = ret.return_value
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/core/utils.py", line 260, in return_value
+    raise self._return_value
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+  File "train.py", line 156, in launch_rlg_hydra
+    runner.run({
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/torch_runner.py", line 120, in run
+    self.run_train(args)
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/torch_runner.py", line 101, in run_train
+    agent.train()
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/common/a2c_common.py", line 1173, in train
+    step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul = self.train_epoch()
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/common/a2c_common.py", line 1037, in train_epoch
+    batch_dict = self.play_steps()
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/common/a2c_common.py", line 626, in play_steps
+    res_dict = self.get_action_values(self.obs)
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/common/a2c_common.py", line 348, in get_action_values
+    res_dict = self.model(input_dict)
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/algos_torch/models.py", line 247, in forward
+    mu, logstd, value, states = self.a2c_network(input_dict)
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/envs/multi_input_network_replay.py", line 213, in forward
+    out = self.actor_cnn(out)
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/torch/nn/modules/container.py", line 139, in forward
+    input = module(input)
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 457, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 453, in _conv_forward
+    return F.conv2d(input, weight, bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_INTERNAL_ERROR
+You can try to repro this exception using the following code snippet. If that doesn't trigger the error, please include your original repro script when reporting this issue.
+
+import torch
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.deterministic = False
+torch.backends.cudnn.allow_tf32 = True
+data = torch.randn([512, 1, 240, 240], dtype=torch.float, device='cuda', requires_grad=True).to(memory_format=torch.channels_last)
+net = torch.nn.Conv2d(1, 8, kernel_size=[16, 16], padding=[0, 0], stride=[4, 4], dilation=[1, 1], groups=1)
+net = net.cuda().float().to(memory_format=torch.channels_last)
+out = net(data)
+out.backward(torch.randn_like(out))
+torch.cuda.synchronize()
+
+ConvolutionParams 
+    memory_format = ChannelsLast
+    data_type = CUDNN_DATA_FLOAT
+    padding = [0, 0, 0]
+    stride = [4, 4, 0]
+    dilation = [1, 1, 0]
+    groups = 1
+    deterministic = false
+    allow_tf32 = true
+input: TensorDescriptor 0x5617e787a0e0
+    type = CUDNN_DATA_FLOAT
+    nbDims = 4
+    dimA = 512, 1, 240, 240, 
+    strideA = 57600, 1, 240, 1, 
+output: TensorDescriptor 0x5617e7879d00
+    type = CUDNN_DATA_FLOAT
+    nbDims = 4
+    dimA = 512, 8, 57, 57, 
+    strideA = 25992, 1, 456, 8, 
+weight: FilterDescriptor 0x5617eee45b00
+    type = CUDNN_DATA_FLOAT
+    tensor_format = CUDNN_TENSOR_NHWC
+    nbDims = 4
+    dimA = 8, 1, 16, 16, 
+Pointer addresses: 
+    input: 0x7f5ff2000000
+    output: 0x7f5fea000000
+    weight: 0x7f6140509600
+

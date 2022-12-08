@@ -1,20 +1,20 @@
 # used to create the object
-name: Bumpybot
+name: Hsr
 
 physics_engine: ${..physics_engine}
 
 videoDir: ''
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:512,${...num_envs}}
+  numEnvs: ${resolve_default:128,${...num_envs}}
   envSpacing: 3
-  episodeLength: 500
-  controlFrequencyInv: 5
+  episodeLength: 250
+  controlFrequencyInv: 5 #DONT CHANGE THIS
   enableDebugVis: False
 
   clipActions: 1.0
 
-  velocityGoal : 1.0
+  velocityGoal : 0.22
   angVelocityGoal: 0
   goalRadius: 0.1
 
@@ -31,13 +31,14 @@ env:
   goalBonus: 100
 
   # control parameters
-  forceScale: 20 # F = ma => goal: 1 N force = 1 m/s/s acceleration
-  torqueScale: 1.28 # 1/0.78 T = Ia => goal: 1 Nm torque = 1 rad/s/s angular acceleration
-  # for a cylinder, I = 0.5*m*r^2 = 0.78 => m=20 kg r=0.2794 m 
+  actionRandomization: 0.05
+  forceScale: 37 # F = ma => goal: 1 N force = 1 m/s/s acceleration
+  torqueScale: 3.42065 # T = Ia => goal: 1 Nm torque = 1 rad/s/s angular acceleration
+  # for a cylinder, I = 0.5*m*r^2 = 3.42 => m=37 kg r=0.43 m 
 
   asset:
-    assetFileName: "urdf/bumpybot.urdf"
-    occupancyFileName: "occupancy/hall.png"
+    assetFileName: "urdf/hsr.urdf"
+    occupancyFileName: "occupancy/AHG_hall.png"
     humanFileName: "urdf/human/human.urdf"
     #humanFileName: "urdf/block.urdf"
     numHumans: 0
@@ -49,8 +50,8 @@ env:
 
   path:
     start: [0,0]
-    target: [0,15]
-    filterDist: 0.9
+    target: [0,5]
+    filterDist: 0.5
     showPath: False
 
   plane:
@@ -62,25 +63,25 @@ env:
   enableCameraSensors: True
 
 image:
-  height: 128
-  width: 128
+  height: 240
+  width: 240
   depth: 1
-  range: 10
+  range: 5
   updateFreq: 10 #Hz
   fixCamera: True
 
 viewer:
-  height: 450
-  width: 800
-  pos: [-5.0, 9.0, 10.0]
-  target: [0.0, 9.0, 0.0]
+  height: 1024
+  width: 1024
+  pos: [0.0, -1.0, 5.0]
+  target: [0.0, 5.0, 0.0]
   captureVideo: True
   captureOnce: True
   captureVideoFreq: 10
 
 sim:
   test: ${...test}
-  dt: 0.01 # 1/100 s
+  dt: 0.01 # 1/100 s #DONT CHANGE
   substeps: 4
   up_axis: "z"
   use_gpu_pipeline: ${eq:${...pipeline},"gpu"}

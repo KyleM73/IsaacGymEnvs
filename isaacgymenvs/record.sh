@@ -1,10 +1,11 @@
 #!/bin/bash
-
-localdir=runs/Bumpybot/videos
+task=Hsr
+experimentName=$(ls -t ~/Dropbox/UT/Experiments/$task/| head -1)
+dropboxdir=~/Dropbox/UT/Experiments/$task/$experimentName
+localdir=runs/$task/videos
 videodir=$(ls -t $localdir/| head -1)
-experimentName=$(ls -t ~/Dropbox/UT/Experiments/| head -1)
-dropboxdir=~/Dropbox/UT/Experiments/$experimentName
-numPhases=2
+
+numPhases=1
 
 for i in $(eval echo "{1..$numPhases}")
 do

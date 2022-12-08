@@ -49,6 +49,7 @@ from .trifinger import Trifinger
 from .hallway import Hallway
 from .hallway_camera import HallwayCamera
 from .bumpybot import Bumpybot
+from .hsr import HSR
 
 # Mappings from strings to environments
 isaacgym_task_map = {
@@ -74,4 +75,5 @@ isaacgym_task_map = {
     "Hallway" : Hallway,
     "HallwayCamera" : HallwayCamera,
     "Bumpybot" : Bumpybot,
+    "Hsr" : HSR
 }
