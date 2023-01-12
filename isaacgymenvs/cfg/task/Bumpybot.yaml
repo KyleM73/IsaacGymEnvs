@@ -6,7 +6,7 @@ physics_engine: ${..physics_engine}
 videoDir: ''
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:512,${...num_envs}}
+  numEnvs: ${resolve_default:500,${...num_envs}}
   envSpacing: 3
   episodeLength: 500
   controlFrequencyInv: 5
@@ -14,6 +14,7 @@ env:
 
   clipActions: 1.0
 
+  velocityMax: 1.0
   velocityGoal : 1.0
   angVelocityGoal: 0
   goalRadius: 0.1
@@ -49,7 +50,7 @@ env:
 
   path:
     start: [0,0]
-    target: [0,15]
+    target: [0,5]
     filterDist: 0.9
     showPath: False
 
@@ -65,7 +66,9 @@ image:
   height: 128
   width: 128
   depth: 1
-  range: 10
+  fstack: 10
+  range: 2.5
+  minRange: 0.25
   updateFreq: 10 #Hz
   fixCamera: True
 

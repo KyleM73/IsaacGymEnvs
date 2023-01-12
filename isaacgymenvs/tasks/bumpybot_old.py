@@ -53,12 +53,8 @@ class Bumpybot(VecTask):
             self.img_type = gymapi.IMAGE_DEPTH
         else:
             self.img_type = gymapi.IMAGE_COLOR
-            if self.img_d > 3:
-                self.img_d = 3
-        self.fstack_num = self.cfg["image"]["fstack"]
-        self.channels = self.img_d*self.fstack_num
+            self.img_d >= 3
         self.cam_max_range = self.cfg["image"]["range"]
-        self.cam_min_range = self.cfg["image"]["minRange"]
         self.update_freq = self.cfg["image"]["updateFreq"]
         if self.cfg["image"]["fixCamera"]:
             self.camera_mode = gymapi.FOLLOW_POSITION
@@ -95,11 +91,11 @@ class Bumpybot(VecTask):
         self.max_episode_length = self.cfg["env"]["episodeLength"]
 
         self.cfg["env"]["numObservations"] = 12
-        self.cfg["env"]["numActions"] = 5 #th, scale, humandist, rwalldist, lwalldist
+        self.cfg["env"]["numActions"] = 3
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
 
-        self.img_obs_space = spaces.Box(low=0,high=1,shape=(self.img_w,self.img_h,self.channels))
+        self.img_obs_space = spaces.Box(low=0,high=1,shape=(self.img_w,self.img_h,self.img_d))
         self.vec_obs_space = self.obs_space
         self.obs_space = spaces.Dict(
             spaces={
@@ -137,7 +133,7 @@ class Bumpybot(VecTask):
         self.targets = torch.ones(self.num_envs,dtype=torch.long).to(self.device) #target waypoint index in sef.path. size: [num_envs]
 
         self.goal_vel = self.cfg["env"]["velocityGoal"] * torch.ones(self.num_envs,1,device=self.device)
-        self.max_vel = self.cfg["env"]["velocityMax"]
+        self.max_vel = 1 ##TODO add to config later
         self.goal_ang_vel = self.cfg["env"]["angVelocityGoal"] * torch.ones(self.num_envs,1,device=self.device)
         self.goal_radius = self.cfg["env"]["goalRadius"]
         self.goal_bonus = self.cfg["env"]["goalBonus"]
@@ -422,11 +418,11 @@ class Bumpybot(VecTask):
 
         start_pose = gymapi.Transform()
         start_pose.p = gymapi.Vec3(*get_axis_params(0.635/2, self.up_axis_idx))
-        start_pose.r = gymapi.Quat.from_euler_zyx(0,0,np.pi/2) #face y axis
+        start_pose.r = gymapi.Quat.from_euler_zyx(0, 0, np.pi/2) #face y axis
 
         walls_pose = gymapi.Transform()
         walls_pose.p = gymapi.Vec3(0,0,0)
-        walls_pose.r = gymapi.Quat.from_euler_zyx(0,0,0)
+        walls_pose.r = gymapi.Quat.from_euler_zyx(0, 0, 0)
 
         camera_props = gymapi.CameraProperties()
         camera_props.width = self.img_w
@@ -435,8 +431,8 @@ class Bumpybot(VecTask):
         camera_props.enable_tensors = True
 
         camera_pose = gymapi.Transform()
-        camera_pose.p = gymapi.Vec3(0,0.169,0.485) # get real values from robot
-        camera_pose.r = gymapi.Quat.from_euler_zyx(0,0,np.pi/2)
+        camera_pose.p = gymapi.Vec3(0,0.25,0.3) # get real values from robot
+        camera_pose.r = gymapi.Quat.from_euler_zyx(0, 0, np.pi/2)
 
         if self.test and self.cfg["env"]["path"]["showPath"]:
             path_path = env_c.path2urdf(self.path,occ_root)
@@ -537,29 +533,26 @@ class Bumpybot(VecTask):
 
     def allocate_buffers(self):
         super().allocate_buffers()
-        self.img_tensor = torch.zeros(self.num_envs,self.img_w,self.img_h,self.channels,device=self.device)
+        self.img_tensor = torch.zeros(self.num_envs,self.img_w,self.img_h,self.img_d,device=self.device)
         self.frames_in_contact = torch.zeros_like(self.progress_buf,device=self.device)
 
     def _get_images(self):
         if self.steps % self.update_freq and not self.test:
             return
+        #img_dir = "tmp_imgs"
+        #if not os.path.exists(img_dir):
+        #    os.mkdir(img_dir)
         self.gym.fetch_results(self.sim,True)
         self.gym.step_graphics(self.sim)
         self.gym.render_all_camera_sensors(self.sim)
         self.gym.start_access_image_tensors(self.sim)
         for i in range(self.num_envs):
-            img = self.cam_tensors[i].view(self.img_h,self.img_w) #self.img_d
-            if self.fstack_num > 1:
-                for j in range(self.fstack_num-1):
-                    self.img_tensor[i,:,:,j+1] = self.img_tensor[i,:,:,j]
-                self.img_tensor[i,:,:,0] = self._normalize_image(img)
-            else:
-                self.img_tensor[i,...] = self._normalize_image(img)
-        if self.record and not self.resets % self.record_freq:
-            if self.fstack_num > 1:
-                self.frames.append([self.ax.imshow(255*self.img_tensor[0,:,:,0].cpu().numpy(),animated=True,cmap="gray")])
-            else: 
-                self.frames.append([self.ax.imshow(255*self.img_tensor[0,...].cpu().numpy(),animated=True,cmap="gray")])
+            img = self.cam_tensors[i].view(self.img_h,self.img_w,self.img_d)
+            self.img_tensor[i,...] = self._normalize_image(img)
+            #fname = os.path.join(img_dir, "cam-%04d.png" % i)
+            #imageio.imwrite(fname, 255*self._normalize_image(img).cpu().numpy())
+        if self.record and not self.resets % self.record_freq: 
+            self.frames.append([self.ax.imshow(255*self.img_tensor[0,...].cpu().numpy(),animated=True,cmap="gray")])
 
             img_rgb = self.torch_cam_tensor_rgb.view(self.rgb_h,self.rgb_w,4).cpu().numpy()
             self.frames_rgb.append([self.ax_rgb.imshow(img_rgb,animated=True)])
@@ -567,7 +560,7 @@ class Bumpybot(VecTask):
         self.gym.end_access_image_tensors(self.sim)            
 
     def _normalize_image(self,img):
-        return normalize_image(img,self.cam_max_range,self.cam_min_range)
+        return normalize_image(img,self.cam_max_range)
 
     def _compute_reward(self, actions):
         self.rew_buf[:], self.reset_buf[:], self.targets[:], self.frames_in_contact[:] = compute_reward(
@@ -650,18 +643,34 @@ class Bumpybot(VecTask):
         #    - e.g. apply actions
         # apply  forces
         self.prev_root[:] = self.root_tensor.clone()
-        estimates = actions[:, 2:]
-        actions = actions[:, :2]
+
+        vel_check = torch.where(torch.linalg.norm(self.root_tensor[::self.num_assets,7:10],dim=-1) < self.max_vel,1,0).view(-1,1).repeat(1,3).to(self.device)
+
+        x_check_cond = torch.abs(self.root_tensor[::self.num_assets,7] + self.action[0]*self.dt) < self.max_vel
+        x_check = torch.where(x_check_cond,1,0)
+        y_check_cond = torch.abs(self.root_tensor[::self.num_assets,8] + self.action[1]*self.dt) < self.max_vel
+        y_check = torch.where(y_check_cond,1,0)
+        th_check_cond = torch.abs(self.root_tensor[::self.num_assets,12] + self.action[2]*self.dt) < seld.max_avel
+        th_check = torch.where(th_check_cond,1,0)
+        print(x_check.size())
+        print(y_check.size())
+        print(th_check.size())
+        assert False
+        vel_check = torch.cat((x_check,y_check,th_check),dim=0)
+        
+        action_noise = 0.1*(2*torch.rand(actions.size())-1) #[-0.1,0.1)
+        actions = actions + action_noise.to(self.device)
+        actions = vel_check * actions
 
         self.actions = actions.to(self.device).clone()
 
-        #forces = torch.zeros((self.num_envs*self.num_bodies, 3), device="cuda:0", dtype=torch.float)
-        #forces[::self.num_bodies, :2] = self.force_scale * self.actions[:, :2]
+        forces = torch.zeros((self.num_envs*self.num_bodies, 3), device="cuda:0", dtype=torch.float)
+        forces[::self.num_bodies, :2] = self.force_scale * self.actions[:, :2]
 
-        #torques = torch.zeros((self.num_envs*self.num_bodies, 3), device="cuda:0", dtype=torch.float)
-        #torques[::self.num_bodies, 2] = 0*self.torque_scale * self.actions[:, 2]
+        torques = torch.zeros((self.num_envs*self.num_bodies, 3), device="cuda:0", dtype=torch.float)
+        torques[::self.num_bodies, 2] = 0*self.torque_scale * self.actions[:, 2]
 
-        #self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(forces), gymtorch.unwrap_tensor(torques), gymapi.ENV_SPACE)
+        self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(forces), gymtorch.unwrap_tensor(torques), gymapi.ENV_SPACE)
 
     def post_physics_step(self):
         # implement post-physics simulation code here
@@ -772,10 +781,9 @@ def get_contact_force(vel,vel_p,dt,dt_action,action,mass):
     return mass * a
 
 @torch.jit.script
-def normalize_image(img,cam_max_range,cam_min_range):
+def normalize_image(img,cam_max_range):
     # [W,H,C]
     img[img < -cam_max_range] = -cam_max_range
-    img[img > -cam_min_range] = -cam_min_range
     img = -torch.abs(img/(-cam_max_range)) + 1
     return img
 
