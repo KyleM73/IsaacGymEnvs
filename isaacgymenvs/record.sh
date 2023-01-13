@@ -1,5 +1,5 @@
 #!/bin/bash
-task=Hsr
+task=Bumpybot
 experimentName=$(ls -t ~/Dropbox/UT/Experiments/$task/| head -1)
 dropboxdir=~/Dropbox/UT/Experiments/$task/$experimentName
 localdir=runs/$task/videos
