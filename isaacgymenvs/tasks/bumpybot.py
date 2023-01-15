@@ -25,7 +25,7 @@ from isaacgymenvs.utils.img_utils import rgba2rgb
 from isaacgymenvs.tasks.base.vec_task import VecTask
 
 class Bumpybot(VecTask):
-    def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
+    def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render=True):
         set_np_formatting()
         self.cfg = cfg
 
@@ -77,8 +77,8 @@ class Bumpybot(VecTask):
         if self.record:
             self._set_fig()
             self.fps = int((self.dt * self.update_freq)**-1)
-            if self.test:
-                self.fps *= 2
+            #if self.test:
+            #    self.fps *= 2
             self.resets = -1
             self.writer = animation.FFMpegWriter(fps=self.fps) 
             vdir = self.cfg["videoDir"]
@@ -131,7 +131,7 @@ class Bumpybot(VecTask):
 
         self.initial_root_state = self.root_tensor.clone()
         self.initial_root_state[:, 7:13] = 0  #set velocities to zero
-        self.prev_root = self.root_tensor.clone()
+        self.prev_root = self.initial_root_state.clone()
         self.prev_actions = None
 
         self.path.insert(0,tuple(self.cfg["env"]["path"]["start"])) #append start location to beginning of path
@@ -170,13 +170,20 @@ class Bumpybot(VecTask):
         self.fig_q,self.ax_q = plt.subplots(3,1)
         self.fig_qdot,self.ax_qdot = plt.subplots(3,1)
         self.fig_qddot,self.ax_qddot = plt.subplots(3,1)
-        self.fig_err,self.ax_err = plt.subplots(5,1)
+        self.fig_err,self.ax_err = plt.subplots(3,1)
         self.fig_contact,self.ax_contact = plt.subplots(2,1)
+        self.fig_cnn,self.ax_cnn = plt.subplots(2,1)
         self.x_hist,self.y_hist,self.th_hist = [],[],[]
         self.vx_hist,self.vy_hist,self.vth_hist = [],[],[]
         self.av_hist,self.ah_hist,self.ath_hist = [],[],[]
         self.xerr_hist,self.yerr_hist,self.therr_hist = [],[],[]
         self.heading_hist,self.contact_hist = [],[]
+        self.heading_motion,self.heading_cam = [],[]
+        if self.cfg["env"]["asset"]["numHumans"] > 0:
+            self.human_contact_hists = [[] for _ in range(self.cfg["env"]["asset"]["numHumans"])]
+        self.human_est,self.human_real = [],[]
+        self.lwall_est,self.lwall_real = [],[]
+        self.rwall_est,self.rwall_real = [],[]
 
     def _fill_fig(self):
         #from root state 
@@ -184,7 +191,7 @@ class Bumpybot(VecTask):
         self.y_hist.append(self.root_tensor[0,1].cpu())
         rotation = self.root_tensor[::self.num_assets,3:7].cpu()
         _,_,yaw = get_euler_xyz(rotation)
-        heading = normalize_angle(yaw).unsqueeze(-1)
+        heading = normalize_angle(yaw).unsqueeze(-1) - np.pi/2
         self.th_hist.append(heading[0])
         self.vx_hist.append(self.root_tensor[0,7].cpu())
         self.vy_hist.append(self.root_tensor[0,8].cpu())
@@ -192,19 +199,35 @@ class Bumpybot(VecTask):
 
         #from actions
         self.av_hist.append(self.actions[0,0])
-        self.ah_hist.append(self.actions[0,1])
-        self.ath_hist.append(self.actions[0,2])
+        self.ah_hist.append(self.actions[0,1]/np.pi)
+        self.ath_hist.append(self.actions[0,2]/np.pi)
 
         #from obs
         self.xerr_hist.append(self.obs_buf[0,0].cpu())
         self.yerr_hist.append(self.obs_buf[0,1].cpu())
         self.therr_hist.append(self.obs_buf[0,8].cpu())
-        heading_diff = self.obs_buf[0,7].cpu()-self.obs_buf[0,9].cpu() - np.pi/2
+        self.heading_motion.append(self.obs_buf[0,9].cpu())
+        self.heading_cam.append(self.obs_buf[0,7].cpu())
+        heading_diff = self.obs_buf[0,7].cpu()-self.obs_buf[0,9].cpu()
         heading_diff = (heading_diff + 2*np.pi) % (2*np.pi)
         if heading_diff > np.pi:
             heading_diff -= 2*np.pi
         self.heading_hist.append(heading_diff)
         self.contact_hist.append(self.obs_buf[0,12].cpu())
+        if self.num_humans > 0:
+            for i in range(self.num_humans):
+                # lower body (incuding pelivs) = inds [3,13]
+                human_cf = self.net_cf[self.asset_bodies+self.walls_bodies+i*self.human_bodies+3:self.asset_bodies+self.walls_bodies+i*self.human_bodies+13+1,:2]
+                self.human_contact_hists[i].append(torch.linalg.norm(torch.sum(human_cf,dim=0))/self.contact_lim)
+
+        #from dists
+        self.dists = self._get_asset_dist()
+        self.human_est.append(self.actions[0,3].cpu())
+        self.human_real.append(self.dists[0][0].cpu())
+        self.lwall_est.append(self.actions[0,4].cpu())
+        self.lwall_real.append(self.dists[1][0].cpu())
+        self.rwall_est.append(self.actions[0,5].cpu())
+        self.rwall_real.append(self.dists[2][0].cpu())
 
     def _make_plots(self,label):
         assert isinstance(label,str)
@@ -224,7 +247,18 @@ class Bumpybot(VecTask):
         self.yerr_hist[0] = self.yerr_hist[1]
         self.therr_hist[0] = self.therr_hist[1]
         self.heading_hist[0] = self.heading_hist[1]
+        self.heading_motion[0] = self.heading_motion[1]
+        self.heading_cam[0] = self.heading_cam[1]
         self.contact_hist[0] = self.contact_hist[1]
+        if self.num_humans > 0:
+            for i in range(self.num_humans):
+                self.human_contact_hists[i][0] = self.human_contact_hists[i][1]
+        self.human_est[0] = self.human_est[1]
+        self.human_real[0] = self.human_real[1]
+        self.lwall_est[0] = self.lwall_est[1]
+        self.lwall_real[0] = self.lwall_real[1]
+        self.rwall_est[0] = self.rwall_est[1]
+        self.rwall_real[0] = self.rwall_real[1]
 
         self.ax_q[0].plot(t,self.x_hist,label="x")
         self.ax_q[0].set_ylabel("x")
@@ -236,6 +270,7 @@ class Bumpybot(VecTask):
         self.ax_q[2].set_ylabel("th")
         self.ax_q[2].set_xlabel("steps")
         self.fig_q.suptitle("Pose",fontsize=16)
+        #self.fig_q.legend(loc="upper right")
         if label == "train":
             q_fname = "{dir}/train_reset{reset}/pose.png".format(dir=self.video_dir,reset=self.resets)
         else:
@@ -252,22 +287,24 @@ class Bumpybot(VecTask):
         self.ax_qdot[2].set_ylabel("vth")
         self.ax_qdot[2].set_xlabel("steps")
         self.fig_qdot.suptitle("Velocity",fontsize=16)
+        #self.fig_qdot.legend(loc="upper right")
         if label == "train":
             qdot_fname = "{dir}/train_reset{reset}/velocity.png".format(dir=self.video_dir,reset=self.resets)
         else:
             qdot_fname = "{dir}/test/velocity.png".format(dir=self.video_dir,reset=self.resets)
         self.fig_qdot.savefig(qdot_fname)
 
-        self.ax_qddot[0].plot(t,self.av_hist,label="ax")
-        self.ax_qddot[0].set_ylabel("ax")
+        self.ax_qddot[0].plot(t,self.av_hist,label="av")
+        self.ax_qddot[0].set_ylabel("av")
         self.ax_qddot[0].set_xticks([])
-        self.ax_qddot[1].plot(t,self.ah_hist,label="ay")
-        self.ax_qddot[1].set_ylabel("ay")
+        self.ax_qddot[1].plot(t,self.ah_hist,label="ah")
+        self.ax_qddot[1].set_ylabel("ah")
         self.ax_qddot[1].set_xticks([])
         self.ax_qddot[2].plot(t,self.ath_hist,label="ath")
         self.ax_qddot[2].set_ylabel("ath")
         self.ax_qddot[2].set_xlabel("steps")
         self.fig_qddot.suptitle("Action",fontsize=16)
+        #self.fig_qddot.legend(loc="upper right")
         for ax in self.ax_qddot:
             ax.set_ylim([-1.5,1.5])
         if label == "train":
@@ -286,6 +323,7 @@ class Bumpybot(VecTask):
         self.ax_err[2].set_ylabel("th error")
         self.ax_err[2].set_xlabel("steps")
         self.fig_err.suptitle("Error",fontsize=16)
+        #self.fig_err.legend(loc="upper right")
         if label == "train":
             err_fname = "{dir}/train_reset{reset}/error.png".format(dir=self.video_dir,reset=self.resets)
         else:
@@ -293,17 +331,43 @@ class Bumpybot(VecTask):
         self.fig_err.savefig(err_fname)
 
         self.ax_contact[0].plot(t,self.heading_hist,label="heading")
+        self.ax_contact[0].plot(t,self.heading_motion,label="heading motion")
+        self.ax_contact[0].plot(t,self.heading_cam,label="heading cam")
         self.ax_contact[0].set_ylabel("heading error")
+        self.ax_contact[0].legend(loc="upper right")
         self.ax_contact[0].set_xticks([])
-        self.ax_contact[1].plot(t,self.contact_hist,label="contact")
+        self.ax_contact[1].plot(t,self.contact_hist,label="contact",zorder=10)
+        if self.num_humans > 0:
+            for i in range(self.num_humans):
+                self.ax_contact[1].plot(t,self.human_contact_hists[i],label="human {}".format(i))
+        self.ax_contact[1].set_ylim([0,1.1])
         self.ax_contact[1].set_ylabel("contact ratio")
         self.ax_contact[1].set_xlabel("steps")
+        self.ax_contact[1].legend(loc="upper right")
         self.fig_contact.suptitle("Heading & Contact",fontsize=16)
+        #self.fig_contact.legend(loc="upper right")
         if label == "train":
             contact_fname = "{dir}/train_reset{reset}/contact.png".format(dir=self.video_dir,reset=self.resets)
         else:
             contact_fname = "{dir}/test/contact.png".format(dir=self.video_dir,reset=self.resets)
         self.fig_contact.savefig(contact_fname)
+
+        self.ax_cnn[0].plot(t,self.human_est,label="human dist estimate")
+        self.ax_cnn[0].plot(t,self.human_real,label="human dist")
+        self.ax_cnn[0].set_xticks([])
+        self.ax_cnn[0].legend(loc="upper right")
+        self.ax_cnn[1].plot(t,self.lwall_est,label="left wall dist estimate")
+        self.ax_cnn[1].plot(t,self.lwall_real,label="left wall dist")
+        self.ax_cnn[1].plot(t,self.rwall_est,label="right wall dist estimate")
+        self.ax_cnn[1].plot(t,self.rwall_real,label="right wall dist")
+        self.ax_cnn[1].legend(loc="upper right")
+        self.fig_cnn.suptitle("CNN Auxiliary Outputs",fontsize=16)
+        #self.fig_cnn.legend(loc="upper right")
+        if label == "train":
+            cnn_fname = "{dir}/train_reset{reset}/cnn.png".format(dir=self.video_dir,reset=self.resets)
+        else:
+            cnn_fname = "{dir}/test/cnn.png".format(dir=self.video_dir,reset=self.resets)
+        self.fig_cnn.savefig(cnn_fname)
 
     def create_sim(self):
         # implement sim set up and environment creation here
@@ -409,9 +473,9 @@ class Bumpybot(VecTask):
 
         asset_options = gymapi.AssetOptions()
         asset_options.collapse_fixed_joints = True
-        #asset_options.fix_base_link = True
+        asset_options.fix_base_link = False
         asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
-        asset_bodies = self.gym.get_asset_rigid_body_count(asset)
+        self.asset_bodies = self.gym.get_asset_rigid_body_count(asset)
         self.num_assets += 1
 
         #base_idx = self.gym.find_asset_rigid_body_index(asset, "base")
@@ -426,20 +490,20 @@ class Bumpybot(VecTask):
         walls_options.collapse_fixed_joints = True
         walls_options.fix_base_link = True
         walls = self.gym.load_asset(self.sim, walls_root, walls_file, walls_options)
-        walls_bodies = self.gym.get_asset_rigid_body_count(walls)
+        self.walls_bodies = self.gym.get_asset_rigid_body_count(walls)
         self.num_assets += 1
 
         human_options = gymapi.AssetOptions()
         human_options.collapse_fixed_joints = True
         human_options.fix_base_link = True
         human = self.gym.load_asset(self.sim, human_root, human_file, human_options)
-        human_bodies = self.gym.get_asset_rigid_body_count(human)
+        self.human_bodies = self.gym.get_asset_rigid_body_count(human)
         self.num_assets += self.num_humans
 
-        self.num_bodies = asset_bodies + walls_bodies + self.num_humans*human_bodies
+        self.num_bodies = self.asset_bodies + self.walls_bodies + self.num_humans*self.human_bodies
 
         start_pose = gymapi.Transform()
-        start_pose.p = gymapi.Vec3(*get_axis_params(0.635/2, self.up_axis_idx))
+        start_pose.p = gymapi.Vec3(*get_axis_params(0.6318758/2, self.up_axis_idx))
         start_pose.r = gymapi.Quat.from_euler_zyx(0,0,np.pi/2) #face y axis
 
         walls_pose = gymapi.Transform()
@@ -481,7 +545,7 @@ class Bumpybot(VecTask):
         self.cam_tensors = []
         self.envs = []
         self.human_handles = []
-        self.fs_handles = []
+        #self.fs_handles = []
 
         if self.test and self.set_location:
             human_idx = self.cfg["env"]["asset"]["testIdx"]*np.ones(self.num_envs,dtype=int)
@@ -555,6 +619,7 @@ class Bumpybot(VecTask):
                 self.gym.create_actor(env, path, path_pose, "path", i)
 
         #self.cam_tensors.append(torch_cam_tensor_rgb)
+        #self.cam_tensors_torch = torch.cat(([torch.unsqueeze(cam,0) for cam in self.cam_tensors]),dim=0)
 
         self.mass = self.gym.get_actor_rigid_body_properties(env,handle)[0].mass
 
@@ -572,17 +637,21 @@ class Bumpybot(VecTask):
         self.gym.start_access_image_tensors(self.sim)
         for i in range(self.num_envs):
             img = self.cam_tensors[i].view(self.img_h,self.img_w) #self.img_d
+            img = self._normalize_image(img)
             if self.fstack_num > 1:
                 for j in range(self.fstack_num-1):
-                    self.img_tensor[i,:,:,j+1] = self.img_tensor[i,:,:,j]
-                self.img_tensor[i,:,:,0] = self._normalize_image(img)
+                    if self.prev_actions is None:
+                        self.img_tensor[i,:,:,j+1] = img
+                    else:
+                        self.img_tensor[i,:,:,j+1] = self.img_tensor[i,:,:,j]
+                self.img_tensor[i,:,:,0] = img
             else:
-                self.img_tensor[i,...] = self._normalize_image(img)
+                self.img_tensor[i,...] = img
         if self.record and not self.resets % self.record_freq:
             if self.fstack_num > 1:
-                self.frames.append([self.ax.imshow(255*self.img_tensor[0,:,:,0].cpu().numpy(),animated=True,cmap="gray")])
+                self.frames.append([self.ax.imshow(255*img.cpu().numpy(),animated=True,cmap="gray")])
             else: 
-                self.frames.append([self.ax.imshow(255*self.img_tensor[0,...].cpu().numpy(),animated=True,cmap="gray")])
+                self.frames.append([self.ax.imshow(255*img.cpu().numpy(),animated=True,cmap="gray")])
 
             img_rgb = self.torch_cam_tensor_rgb.view(self.rgb_h,self.rgb_w,4).cpu().numpy()
             self.frames_rgb.append([self.ax_rgb.imshow(img_rgb,animated=True)])
@@ -609,7 +678,7 @@ class Bumpybot(VecTask):
         return torch.min(human_dists,dim=-1).values,left_wall_dist,right_wall_dist
 
     def _compute_reward(self, actions):
-        dists = self._get_asset_dist()
+        self.dists = self._get_asset_dist()
         self.rew_buf[:], self.reset_buf[:], self.targets[:], self.frames_in_contact[:] = compute_reward(
             self.obs_buf,
             self.reset_buf,
@@ -631,31 +700,15 @@ class Bumpybot(VecTask):
             self.reward_scale,
             self.prev_actions,
             self.estimates,
-            dists[0].to(self.device),
-            dists[1],
-            dists[2]
+            self.dists[0].to(self.device),
+            self.dists[1],
+            self.dists[2]
             )
 
     def _compute_observations(self):
         self.gym.refresh_actor_root_state_tensor(self.sim)
         #self.gym.refresh_force_sensor_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
-        #for i in range(2):
-        #    if torch.abs(self.net_cf[::self.num_bodies, i]) > 0.01:
-        #        print("net cf")
-        #    if torch.abs(self.fsdata[:, i]) > 0.01:
-        #        print("fsdata")
-        #print()
-
-        #self.contact_forces = self.net_cf[::self.num_bodies, :2]
-        #self.contact_forces = get_contact_force(
-        #    self.root_tensor[::self.num_assets,7:9],
-        #    self.prev_root[::self.num_assets,7:9],
-        #    self.dt*self.control_freq_inv,
-        #    self.dt,
-        #    self.forces[::self.num_bodies, :2],
-        #    self.mass
-        #    )
 
         self.obs_buf[:] = compute_observations(
             self.root_tensor,
@@ -701,10 +754,11 @@ class Bumpybot(VecTask):
         else:
             self.prev_actions = self.actions.clone()
             self.actions = actions.to(self.device).clone() #v_d,th_d,heading_d
-        self.estimates = self.actions[:, 3:]
 
         self.actions[:, 1] *= np.pi
         self.actions[:, 2] *= np.pi
+        self.actions[:, 3] *= self.cam_max_range
+        self.estimates = self.actions[:, 3:]
 
         ## TESTING
         #self.actions[:, 0] = 1
@@ -719,6 +773,18 @@ class Bumpybot(VecTask):
         self.torques = torch.zeros((self.num_envs*self.num_bodies, 3), device="cuda:0", dtype=torch.float)
 
         self.prev_root[:] = self.root_tensor.clone()
+
+        # lines
+        n_lines= 2
+        colors = torch.zeros(n_lines,3)
+        colors[0,0] = 255 #motion heading
+        colors[1,1] = 255 #camera heading
+        for i in range(self.num_envs):
+            verts = torch.zeros(n_lines*2,3)
+            verts[0,:2] = self.root_tensor[::self.num_assets,:2][i]
+            verts[1,0] = self.root_tensor[::self.num_assets,0][i] + self.vel_dx[i]
+            verts[1,1] = self.root_tensor[::self.num_assets,1][i] + self.vel_dy[i]
+            self.gym.add_lines(self.viewer,self.envs[i],n_lines,verts,colors)
 
     def post_physics_step(self):
         # implement post-physics simulation code here
@@ -773,6 +839,7 @@ class Bumpybot(VecTask):
         self._get_images()
         self._compute_observations()
         self._compute_reward(self.actions)
+        self.gym.clear_lines(self.viewer)
 
         self.steps += self.step_inc
 
@@ -824,10 +891,6 @@ class Bumpybot(VecTask):
 
         # fill time out buffer: set to 1 if we reached the max episode length AND the reset buffer is 1. Timeout == 1 makes sense only if the reset buffer is 1.
         self.timeout_buf = (self.progress_buf >= self.max_episode_length - 1) & (self.reset_buf != 0)
-
-        # randomize observations
-        if self.dr_randomizations.get('observations', None):
-            self.obs_buf = self.dr_randomizations['observations']['noise_lambda'](self.obs_buf)
 
         self.extras["time_outs"] = self.timeout_buf.to(self.rl_device)
 
@@ -1027,7 +1090,7 @@ def compute_observations(
     pose_error = position[:, :2] - path[targets]
 
     _,_,yaw = get_euler_xyz(rotation)
-    heading = normalize_angle(yaw).unsqueeze(-1)
+    heading = normalize_angle(yaw).unsqueeze(-1) - np.pi/2
 
     next_pose_error = position[:, :2] - path[targets+1]
     xaxis = torch.zeros_like(next_pose_error)
@@ -1041,19 +1104,19 @@ def compute_observations(
     target_angs = torch.arccos(dot_prod).view(-1,1)
     heading_err = heading - target_angs #where camera should be pointed
 
-    motion_heading = torch.atan2(velocity[:, 0],velocity[:, 1]).view(-1,1)
+    motion_heading = normalize_angle(torch.atan2(velocity[:, 0],velocity[:, 1])).unsqueeze(-1) - np.pi/2#.view(-1,1)
 
     contact_norm = torch.linalg.norm(contact_forces,dim=-1).view((-1,1))
     contact_scaled = contact_forces / (contact_norm + 1e-7)
     contact_ratio = contact_norm / (contact_lim + 1e-7)
 
     obs = torch.cat((
-        pose_error, next_pose_error, #2, 2
-        velocity[:, :2], ang_velocity.view(-1,1), #2, 1
-        heading, heading_err, #1, 1
-        motion_heading, #1
-        contact_scaled, contact_ratio, #2, 1
-        actions[:, :3] #3
+        pose_error, next_pose_error, #0,1, 2,3
+        velocity[:, :2], ang_velocity.view(-1,1), #4,5, 6
+        heading, heading_err, #7, 8
+        motion_heading, #9
+        contact_scaled, contact_ratio, #10,11, 12
+        actions[:, :3] #13,14,15
         ),dim=-1)
 
-    return obs
+    return obs #[-1,16]

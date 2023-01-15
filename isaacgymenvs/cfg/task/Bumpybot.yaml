@@ -6,9 +6,9 @@ physics_engine: ${..physics_engine}
 videoDir: ''
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:100,${...num_envs}}
+  numEnvs: ${resolve_default:10,${...num_envs}}
   envSpacing: 3
-  episodeLength: 500
+  episodeLength: 100
   controlFrequencyInv: 10 #5 #Hz
   enableDebugVis: False
 
@@ -75,10 +75,10 @@ image:
   FOV: 120
 
 viewer:
-  height: 450
-  width: 800
-  pos: [-5.0, 9.0, 10.0]
-  target: [0.0, 9.0, 0.0]
+  height: 900
+  width: 1600
+  pos: [-2.0, 4.0, 6.0]
+  target: [0.0, 4.0, 0.0]
   captureVideo: True
   captureOnce: True
   captureVideoFreq: 10
@@ -95,11 +95,11 @@ sim:
     solver_type: ${....solver_type}
     use_gpu: ${contains:"cuda",${....sim_device}} # set to False to run on CPU
     num_position_iterations: 4
-    num_velocity_iterations: 0
+    num_velocity_iterations: 1 #0
     contact_offset: 0.02
-    rest_offset: 0.0
+    rest_offset: 0.01 #0
     bounce_threshold_velocity: 0.2
-    max_depenetration_velocity: 2.0
+    max_depenetration_velocity: 100.0 #2
     default_buffer_size_multiplier: 5.0
     max_gpu_contact_pairs: 8388608 # 8*1024*1024
     num_subscenes: ${....num_subscenes}

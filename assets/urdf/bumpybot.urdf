@@ -9,7 +9,7 @@
     </inertial>
     <visual>
       <geometry>
-        <cylinder length="0.635" radius="0.2794"/>
+        <cylinder length="0.6318758" radius="0.3048"/>
       </geometry>
       <material name="blue">
         <color rgba="0 0 0.8 1"/>
@@ -18,7 +18,7 @@
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
       <geometry>
-        <cylinder length="0.635" radius="0.2794"/>
+        <cylinder length="0.6318758" radius="0.3048"/>
       </geometry>
       <sdf resolution="256"/>
     </collision>
