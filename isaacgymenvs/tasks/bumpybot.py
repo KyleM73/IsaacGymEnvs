@@ -173,6 +173,7 @@ class Bumpybot(VecTask):
         self.fig_err,self.ax_err = plt.subplots(3,1)
         self.fig_contact,self.ax_contact = plt.subplots(2,1)
         self.fig_cnn,self.ax_cnn = plt.subplots(2,1)
+        self.fig_rew,self.ax_rew = plt.subplots(1,1)
         self.x_hist,self.y_hist,self.th_hist = [],[],[]
         self.vx_hist,self.vy_hist,self.vth_hist = [],[],[]
         self.av_hist,self.ah_hist,self.ath_hist = [],[],[]
@@ -184,6 +185,7 @@ class Bumpybot(VecTask):
         self.human_est,self.human_real = [],[]
         self.lwall_est,self.lwall_real = [],[]
         self.rwall_est,self.rwall_real = [],[]
+        self.step_rew = []
 
     def _fill_fig(self):
         #from root state 
@@ -199,8 +201,8 @@ class Bumpybot(VecTask):
 
         #from actions
         self.av_hist.append(self.actions[0,0])
-        self.ah_hist.append(self.actions[0,1]/np.pi)
-        self.ath_hist.append(self.actions[0,2]/np.pi)
+        self.ah_hist.append(self.actions[0,1])
+        self.ath_hist.append(self.actions[0,2])
 
         #from obs
         self.xerr_hist.append(self.obs_buf[0,0].cpu())
@@ -228,6 +230,8 @@ class Bumpybot(VecTask):
         self.lwall_real.append(self.dists[1][0].cpu())
         self.rwall_est.append(self.actions[0,5].cpu())
         self.rwall_real.append(self.dists[2][0].cpu())
+
+        self.step_rew.append(self.rew_buf[0].cpu())
 
     def _make_plots(self,label):
         assert isinstance(label,str)
@@ -259,6 +263,7 @@ class Bumpybot(VecTask):
         self.lwall_real[0] = self.lwall_real[1]
         self.rwall_est[0] = self.rwall_est[1]
         self.rwall_real[0] = self.rwall_real[1]
+        self.step_rew[0] = self.step_rew[1]
 
         self.ax_q[0].plot(t,self.x_hist,label="x")
         self.ax_q[0].set_ylabel("x")
@@ -330,7 +335,7 @@ class Bumpybot(VecTask):
             err_fname = "{dir}/test/error.png".format(dir=self.video_dir,reset=self.resets)
         self.fig_err.savefig(err_fname)
 
-        self.ax_contact[0].plot(t,self.heading_hist,label="heading")
+        self.ax_contact[0].plot(t,self.heading_hist,label="heading diff")
         self.ax_contact[0].plot(t,self.heading_motion,label="heading motion")
         self.ax_contact[0].plot(t,self.heading_cam,label="heading cam")
         self.ax_contact[0].set_ylabel("heading error")
@@ -368,6 +373,15 @@ class Bumpybot(VecTask):
         else:
             cnn_fname = "{dir}/test/cnn.png".format(dir=self.video_dir,reset=self.resets)
         self.fig_cnn.savefig(cnn_fname)
+
+        self.ax_rew.plot(t,self.step_rew,label="reward")
+        self.ax_rew.set_ylim([0,2.1])
+        self.fig_rew.suptitle("Rewards",fontsize=16)
+        if label == "train":
+            rew_fname = "{dir}/train_reset{reset}/rewards.png".format(dir=self.video_dir,reset=self.resets)
+        else:
+            rew_fname = "{dir}/test/rewards.png".format(dir=self.video_dir,reset=self.resets)
+        self.fig_rew.savefig(rew_fname)
 
     def create_sim(self):
         # implement sim set up and environment creation here
@@ -755,19 +769,23 @@ class Bumpybot(VecTask):
             self.prev_actions = self.actions.clone()
             self.actions = actions.to(self.device).clone() #v_d,th_d,heading_d
 
-        self.actions[:, 1] *= np.pi
-        self.actions[:, 2] *= np.pi
         self.actions[:, 3] *= self.cam_max_range
         self.estimates = self.actions[:, 3:]
 
         ## TESTING
         #self.actions[:, 0] = 1
-        #self.actions[:, 1] = 0.5
+        #self.actions[:, 1] = 0
         #self.actions[:, 2] = 0 #-np.pi/2
 
-        self.vel_dx = self.actions[:, 0]*torch.sin(self.actions[:, 1])
-        self.vel_dy = self.actions[:, 0]*torch.cos(self.actions[:, 1])
-        self.heading_d = self.actions[:, 2].view(-1,1)
+        self.vel_dx = self.actions[:, 0]*torch.sin((np.pi/2)*self.actions[:, 1])
+        sgn_vel_dx = torch.sign(self.vel_dx)
+        self.vel_dy = self.actions[:, 0]*torch.cos((np.pi/2)*self.actions[:, 1])
+        sgn_vel_dy = torch.sign(self.vel_dy)
+        self.heading_d = (np.pi/2)*self.actions[:, 2].view(-1,1)
+        heading_dx = torch.sin(self.heading_d)
+        sgn_heading_dx = torch.sign(heading_dx)
+        heading_dy = torch.cos(self.heading_d)
+        sgn_heading_dy = torch.sign(heading_dy)
 
         self.forces = torch.zeros((self.num_envs*self.num_bodies, 3), device="cuda:0", dtype=torch.float)
         self.torques = torch.zeros((self.num_envs*self.num_bodies, 3), device="cuda:0", dtype=torch.float)
@@ -781,10 +799,23 @@ class Bumpybot(VecTask):
         colors[1,1] = 255 #camera heading
         for i in range(self.num_envs):
             verts = torch.zeros(n_lines*2,3)
-            verts[0,:2] = self.root_tensor[::self.num_assets,:2][i]
-            verts[1,0] = self.root_tensor[::self.num_assets,0][i] + self.vel_dx[i]
-            verts[1,1] = self.root_tensor[::self.num_assets,1][i] + self.vel_dy[i]
+            verts[::2,:2] = self.root_tensor[::self.num_assets,:2][i]
+            verts[1,0] = self.root_tensor[::self.num_assets,0][i] + self.vel_dx[i] + sgn_vel_dx[i]*0.3048
+            verts[1,1] = self.root_tensor[::self.num_assets,1][i] + self.vel_dy[i] + sgn_vel_dy[i]*0.3048
+            verts[3,0] = self.root_tensor[::self.num_assets,0][i] + heading_dx[i] + sgn_heading_dx[i]*0.3048
+            verts[3,1] = self.root_tensor[::self.num_assets,1][i] + heading_dy[i] + sgn_heading_dy[i]*0.3048
             self.gym.add_lines(self.viewer,self.envs[i],n_lines,verts,colors)
+
+        err_vx = self.vel_dx - self.root_tensor[::self.num_assets, 7]
+        err_vy = self.vel_dy - self.root_tensor[::self.num_assets, 8]
+        err_th = self.heading_d - normalize_angle(get_euler_xyz(self.root_tensor[::self.num_assets,3:7])[2]).unsqueeze(-1) + np.pi/2
+        err_th = (err_th + 2*np.pi) % (2*np.pi)
+        err_th = torch.where(err_th > np.pi, err_th-2*np.pi,err_th)
+        self.forces[::self.num_bodies, 0] = self.force_scale * torch.clamp(err_vx,-torch.ones_like(err_vx),torch.ones_like(err_vx))
+        self.forces[::self.num_bodies, 1] = self.force_scale * torch.clamp(err_vy,-torch.ones_like(err_vy),torch.ones_like(err_vy))
+        self.torques[::self.num_bodies, 2] = self.torque_scale * torch.clamp(err_th.view(-1),-torch.ones_like(err_th.view(-1)),torch.ones_like(err_th.view(-1)))
+
+        self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.forces), gymtorch.unwrap_tensor(self.torques), gymapi.ENV_SPACE)
 
     def post_physics_step(self):
         # implement post-physics simulation code here
@@ -860,21 +891,10 @@ class Bumpybot(VecTask):
         # step physics and render each frame
         cf = torch.zeros_like(self.net_cf[::self.num_bodies, :2])
         for i in range(self.control_freq_inv):
-            err_vx = self.vel_dx - self.root_tensor[::self.num_assets, 7]
-            err_vy = self.vel_dy - self.root_tensor[::self.num_assets, 8]
-            err_th = self.heading_d - normalize_angle(get_euler_xyz(self.root_tensor[::self.num_assets,3:7])[2]).unsqueeze(-1) + np.pi/2
-            err_th = (err_th + 2*np.pi) % (2*np.pi)
-            err_th = torch.where(err_th > np.pi, err_th-2*np.pi,err_th)
-            self.forces[::self.num_bodies, 0] = self.force_scale * torch.clamp(err_vx,-torch.ones_like(err_vx),torch.ones_like(err_vx))
-            self.forces[::self.num_bodies, 1] = self.force_scale * torch.clamp(err_vy,-torch.ones_like(err_vy),torch.ones_like(err_vy))
-            self.torques[::self.num_bodies, 2] = self.torque_scale * torch.clamp(err_th.view(-1),-torch.ones_like(err_th.view(-1)),torch.ones_like(err_th.view(-1)))
-
-            self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.forces), gymtorch.unwrap_tensor(self.torques), gymapi.ENV_SPACE)
-            
             if self.force_render:
                 self.render()
             self.gym.simulate(self.sim)
-            self.gym.refresh_actor_root_state_tensor(self.sim)
+            #self.gym.refresh_actor_root_state_tensor(self.sim)
             #self.gym.refresh_force_sensor_tensor(self.sim)
             self.gym.refresh_net_contact_force_tensor(self.sim)
 
@@ -1101,10 +1121,10 @@ def compute_observations(
     dot_prod /= torch.linalg.norm(next_pose_error+1e-7,dim=-1)
     dot_prod /= torch.linalg.norm(xaxis+1e-7,dim=-1)
     dot_prod = torch.clamp(dot_prod,-1+1e-7,1-1e-7)
-    target_angs = torch.arccos(dot_prod).view(-1,1)
+    target_angs = torch.arccos(dot_prod).view(-1,1) - np.pi/2
     heading_err = heading - target_angs #where camera should be pointed
 
-    motion_heading = normalize_angle(torch.atan2(velocity[:, 0],velocity[:, 1])).unsqueeze(-1) - np.pi/2#.view(-1,1)
+    motion_heading = normalize_angle(torch.atan2(velocity[:, 0],velocity[:, 1])).unsqueeze(-1) #.view(-1,1)
 
     contact_norm = torch.linalg.norm(contact_forces,dim=-1).view((-1,1))
     contact_scaled = contact_forces / (contact_norm + 1e-7)

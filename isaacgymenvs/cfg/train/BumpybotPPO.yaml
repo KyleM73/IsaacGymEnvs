@@ -96,7 +96,7 @@ params:
     ppo: True
     e_clip: 0.2
     horizon_length: 20 #hz # horizon_length * num_actors * num_agent
-    minibatch_size: 200 #16384 #4096  # need batchsize % minibatch size == 0
+    minibatch_size: 2000 #16384 #4096  # need batchsize % minibatch size == 0
     mini_epochs: 5
     critic_coef: 4
     clip_value: True

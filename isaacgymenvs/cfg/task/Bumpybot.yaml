@@ -6,7 +6,7 @@ physics_engine: ${..physics_engine}
 videoDir: ''
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:10,${...num_envs}}
+  numEnvs: ${resolve_default:100,${...num_envs}}
   envSpacing: 3
   episodeLength: 100
   controlFrequencyInv: 10 #5 #Hz
@@ -42,7 +42,7 @@ env:
     occupancyFileName: "occupancy/hall.png"
     humanFileName: "urdf/human/human.urdf"
     #humanFileName: "urdf/block.urdf"
-    numHumans: 3
+    numHumans: 5
     numSamples: 512
     testIdx: 0 #42
     setLoc: False
