@@ -22,7 +22,10 @@ INSTALL_REQUIRES = [
     #"rl-games==1.5.2", #satisfied by local forked submodule
     "pyvirtualdisplay",
     "rl_games",
-    "EnvCreator"
+    "EnvCreator",
+    "onnx",
+    "onnxruntime",
+    "numpy<1.24.0"
     ]
 
 

@@ -23,7 +23,7 @@ params:
         fixed_sigma: True
 
     linear_projection:
-      shape: 16
+      shape: 32
       activation: elu
 
     cnn:
@@ -37,15 +37,15 @@ params:
       regularizer:
         name: None
       convs:    
-        - filters: 16
+        - filters: 32
           kernel_size: 8
           strides: 5
           padding: 0
-        - filters: 16
+        - filters: 32
           kernel_size: 5
           strides: 2
           padding: 0
-        - filters: 32
+        - filters: 64
           kernel_size: 3
           strides: 1
           padding: 0
@@ -55,7 +55,7 @@ params:
       activation: elu
 
     mlp:
-      units: [128, 64, 32]
+      units: [256, 128, 64] #[128, 64, 32]
       activation: elu
       d2rl: False
 
@@ -96,7 +96,7 @@ params:
     ppo: True
     e_clip: 0.2
     horizon_length: 20 #hz # horizon_length * num_actors * num_agent
-    minibatch_size: 2000 #16384 #4096  # need batchsize % minibatch size == 0
+    minibatch_size: 1000 #16384 #4096  # need batchsize % minibatch size == 0
     mini_epochs: 5
     critic_coef: 4
     clip_value: True

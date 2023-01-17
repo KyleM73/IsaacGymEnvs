@@ -1,12 +1,12 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ $# -eq 0 ]
 then
-    numTests=1
+    numTests=3
     numHumans=5
 elif [ $# -eq 1 ]
 then
-    numTests=1
+    numTests=3
     numHumans=$1
 else
     numTests=$2
@@ -17,14 +17,15 @@ echo Running $numTests tests with $numHumans humans
 task=Bumpybot
 experimentName=Bumpybot
 checkpoint=runs/$experimentName/nn/$experimentName.pth
-batchSize=$(($numTests*20))
 
-dt='date '+%m_%d_%Y-%H_%M''
-viddir=runs/$task/videos/test_$dt
-for i in {1..$numTests}
+dt=$(date '+%m_%d_%Y-%H_%M')
+viddir=test_$dt
+for i in $(seq $numTests)
 do
-    saveviddir=$viddir/test$i
-    python train.py test=True task=Bumpybot headless=True task.env.asset.numHumans=$numHumans experiment=$experimentName num_envs=$numEnvs train.params.config.minibatch_size=$batchSize checkpoint=$checkpoint task.videoDir=$saveviddir
+    saveviddir=$viddir/test$(($i-1))
+    echo Saving to dir $saveviddir
+    python train.py test=True task=Bumpybot headless=True task.env.asset.numHumans=$numHumans experiment=$experimentName num_envs=1 train.params.config.minibatch_size=20 checkpoint=$checkpoint task.videoDir=$viddir
+    mv runs/$experimentName/videos/$viddir/test runs/$experimentName/videos/$viddir/test$(($i-1))
 done
 
-cp -r $saveviddir ~/Dropbox/UT/Experiments/%task/$experimentName
+cp -r runs/$experimentName/videos/$viddir ~/Dropbox/UT/Experiments/$task/$experimentName

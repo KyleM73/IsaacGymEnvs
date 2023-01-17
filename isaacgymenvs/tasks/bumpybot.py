@@ -200,27 +200,27 @@ class Bumpybot(VecTask):
         self.vth_hist.append(self.root_tensor[0,12].cpu())
 
         #from actions
-        self.av_hist.append(self.actions[0,0])
-        self.ah_hist.append(self.actions[0,1])
-        self.ath_hist.append(self.actions[0,2])
+        self.av_hist.append(self.actions[0,0].cpu())
+        self.ah_hist.append(self.actions[0,1].cpu())
+        self.ath_hist.append(self.actions[0,2].cpu())
 
         #from obs
-        self.xerr_hist.append(self.obs_buf[0,0].cpu())
-        self.yerr_hist.append(self.obs_buf[0,1].cpu())
-        self.therr_hist.append(self.obs_buf[0,8].cpu())
-        self.heading_motion.append(self.obs_buf[0,9].cpu())
-        self.heading_cam.append(self.obs_buf[0,7].cpu())
-        heading_diff = self.obs_buf[0,7].cpu()-self.obs_buf[0,9].cpu()
+        self.xerr_hist.append(self.obs_buf[0,0].detach().cpu())
+        self.yerr_hist.append(self.obs_buf[0,1].detach().cpu())
+        self.therr_hist.append(self.obs_buf[0,8].detach().cpu())
+        self.heading_motion.append(self.obs_buf[0,9].detach().cpu())
+        self.heading_cam.append(self.obs_buf[0,7].detach().cpu())
+        heading_diff = self.obs_buf[0,7].detach().cpu()-self.obs_buf[0,9].detach().cpu()
         heading_diff = (heading_diff + 2*np.pi) % (2*np.pi)
         if heading_diff > np.pi:
             heading_diff -= 2*np.pi
         self.heading_hist.append(heading_diff)
-        self.contact_hist.append(self.obs_buf[0,12].cpu())
+        self.contact_hist.append(self.obs_buf[0,12].detach().cpu())
         if self.num_humans > 0:
             for i in range(self.num_humans):
                 # lower body (incuding pelivs) = inds [3,13]
                 human_cf = self.net_cf[self.asset_bodies+self.walls_bodies+i*self.human_bodies+3:self.asset_bodies+self.walls_bodies+i*self.human_bodies+13+1,:2]
-                self.human_contact_hists[i].append(torch.linalg.norm(torch.sum(human_cf,dim=0))/self.contact_lim)
+                self.human_contact_hists[i].append(torch.linalg.norm(torch.sum(human_cf,dim=0)).cpu()/self.contact_lim)
 
         #from dists
         self.dists = self._get_asset_dist()
@@ -231,7 +231,7 @@ class Bumpybot(VecTask):
         self.rwall_est.append(self.actions[0,5].cpu())
         self.rwall_real.append(self.dists[2][0].cpu())
 
-        self.step_rew.append(self.rew_buf[0].cpu())
+        self.step_rew.append(self.rew_buf[0].detach().cpu())
 
     def _make_plots(self,label):
         assert isinstance(label,str)
@@ -467,6 +467,8 @@ class Bumpybot(VecTask):
         else:
             human_loc_data_path = occ_root+"/human_loc_data_"+os.path.basename(occ_path).split(".")[0]+".txt"
             self.num_human_samples = self.cfg["env"]["asset"]["numSamples"]
+            human_target = target[:]
+            human_target[1] -= 1 #give free space to move into at end of path
             if not os.path.exists(human_loc_data_path):
                 print("Generating human location data...")
                 self.loc_data = torch.tensor(env_c.generate_loc_data(start,target,self.num_humans,n=self.num_human_samples,output_dir=occ_root))
@@ -769,7 +771,7 @@ class Bumpybot(VecTask):
             self.prev_actions = self.actions.clone()
             self.actions = actions.to(self.device).clone() #v_d,th_d,heading_d
 
-        self.actions[:, 3] *= self.cam_max_range
+        self.actions[:, 3:] *= self.cam_max_range
         self.estimates = self.actions[:, 3:]
 
         ## TESTING
@@ -814,8 +816,6 @@ class Bumpybot(VecTask):
         self.forces[::self.num_bodies, 0] = self.force_scale * torch.clamp(err_vx,-torch.ones_like(err_vx),torch.ones_like(err_vx))
         self.forces[::self.num_bodies, 1] = self.force_scale * torch.clamp(err_vy,-torch.ones_like(err_vy),torch.ones_like(err_vy))
         self.torques[::self.num_bodies, 2] = self.torque_scale * torch.clamp(err_th.view(-1),-torch.ones_like(err_th.view(-1)),torch.ones_like(err_th.view(-1)))
-
-        self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.forces), gymtorch.unwrap_tensor(self.torques), gymapi.ENV_SPACE)
 
     def post_physics_step(self):
         # implement post-physics simulation code here
@@ -891,6 +891,7 @@ class Bumpybot(VecTask):
         # step physics and render each frame
         cf = torch.zeros_like(self.net_cf[::self.num_bodies, :2])
         for i in range(self.control_freq_inv):
+            self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.forces), gymtorch.unwrap_tensor(self.torques), gymapi.ENV_SPACE)
             if self.force_render:
                 self.render()
             self.gym.simulate(self.sim)
@@ -987,6 +988,7 @@ def get_contact_force(vel,vel_p,dt,dt_action,action,mass):
 
 @torch.jit.script
 def normalize_image(img,cam_max_range,cam_min_range):
+    # type: (Tensor, float, float) -> Tensor
     # [W,H,C]
     img[img < -cam_max_range] = -cam_max_range
     img[img > -cam_min_range] = -cam_min_range
@@ -1071,13 +1073,13 @@ def compute_reward(
 
     # CNN rewards
     human_dists = torch.linalg.norm(cnn_estimates[:, 0].view(-1,1) - human_dist,dim=-1)
-    human_reward = rew_func(human_dist,1.)
+    human_reward = rew_func(human_dist,10.)
 
     l_wall = torch.linalg.norm(cnn_estimates[:, 1].view(-1,1) - left_wall_dist,dim=-1)
-    l_wall_reward = rew_func(l_wall,1.)
+    l_wall_reward = rew_func(l_wall,10.)
 
     r_wall = torch.linalg.norm(cnn_estimates[:, 2].view(-1,1) - right_wall_dist,dim=-1)
-    r_wall_reward = rew_func(r_wall,1.)
+    r_wall_reward = rew_func(r_wall,10.)
 
     cnn_rewards = (2*human_reward + l_wall_reward + r_wall_reward)/4
     total_reward += cnn_rewards

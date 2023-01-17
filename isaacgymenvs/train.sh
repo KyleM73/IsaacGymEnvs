@@ -15,17 +15,20 @@ cp ./tasks/$f.py ~/Dropbox/UT/Experiments/$task/$experimentName/$f.py
 echo "Begin Training"
 echo "Experiment:" $experimentName
 
-## PHASE 1 -- 3 Humans
+## TRAIN
 python train.py task=$task headless=True experiment=$experimentName
 
 cp $checkpoint runs/$experimentName/nn/phase1.pth
 cp $checkpoint ~/Dropbox/UT/Experiments/$task/$experimentName/model.pth
 
+echo training: done > $progressFile
+
+## TEST
 viddir=$(ls -t runs/$task/videos/| head -1)
 
 python train.py task=$task test=True headless=True experiment=$experimentName checkpoint=$checkpoint task.videoDir=$viddir num_envs=1 train.params.config.minibatch_size=20
 
-echo training: done > $progressFile
+echo testing: done > $progressFile
 
 cp $progressFile ~/Dropbox/UT/Experiments/$task/$experimentName
 

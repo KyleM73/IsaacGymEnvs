@@ -16,7 +16,7 @@ do
     do  
         cp -r $localdir/$videodir $dropboxdir
 
-        if $([ -f $dropboxdir/$videodir/progress.txt ])
+        if $([ -f $dropboxdir/progress.txt ])
         then
             flag=0
         fi
