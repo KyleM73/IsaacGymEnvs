@@ -6,9 +6,9 @@ physics_engine: ${..physics_engine}
 videoDir: ''
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:100,${...num_envs}}
+  numEnvs: ${resolve_default:200,${...num_envs}}
   envSpacing: 3
-  episodeLength: 200
+  episodeLength: 500
   controlFrequencyInv: 10 #5 #Hz
   enableDebugVis: False
 
@@ -17,7 +17,7 @@ env:
   velocityMax: 1.0
   velocityGoal : 1.0
   angVelocityGoal: 0
-  goalRadius: 0.1
+  goalRadius: 0.2
 
   # cost parameters
   rewardScale: 1
@@ -27,7 +27,7 @@ env:
   velocityCost: 1
   angularVelocityCost: 1
   contactCost: 1
-  contactLimit: 130 #[N], ~30 lbs
+  contactLimit: 130 #[N], ~15 lbs
   contactThreshold: 65 #N
   deathCost: -1000
   goalBonus: 200
@@ -46,6 +46,8 @@ env:
     numSamples: 512
     testIdx: 0 #42
     setLoc: False
+    start_offset: 0
+    end_offset: 0
     #occupancyFileName: "occupancy/easy_maze.png"
     #reflect: True
 
@@ -67,21 +69,53 @@ image:
   height: 128
   width: 128
   depth: 1
-  fstack: 10
+  fstack: 5
   range: 2.5
-  minRange: 0 #0.25
+  minRange: 0.25
   updateFreq: 10 #Hz
   fixCamera: False
   FOV: 120
 
 viewer:
-  height: 900
-  width: 1600
+  height: 1080
+  width: 1920
   pos: [-2.0, 4.0, 6.0]
   target: [0.0, 4.0, 0.0]
   captureVideo: True
   captureOnce: True
   captureVideoFreq: 10
+  fancyTest:
+    fancyUrdf: "urdf/bumpybot_fancy.urdf"
+    test: False
+    cam_0:
+      height: 1440
+      width: 1440
+    cams:
+      cam_1:
+        height: 1440
+        width: 2560
+        pos: [-2.0, 4.0, 6.0]
+        target: [0.0, 4.0, 0.0]
+      cam_2:
+        height: 1440
+        width: 2560
+        pos: [2.0, 4.0, 6.0]
+        target: [0.0, 4.0, 0.0]
+      cam_3:
+        height: 2560
+        width: 1440
+        pos: [0.0, 4.0, 4.0]
+        target: [0.0, 4.1, 0]
+      cam_4:
+        height: 1440
+        width: 1440
+        pos: [0.0, 0.0, 2.0]
+        target: [0.0, 4.0, 0.0]
+      cam_5:
+        height: 1440
+        width: 1440
+        pos: [0.0, 10.0, 2.0]
+        target: [0.0, 4.0, 0.0]
 
 sim:
   test: ${...test}

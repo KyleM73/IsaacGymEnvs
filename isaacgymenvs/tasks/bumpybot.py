@@ -31,6 +31,7 @@ class Bumpybot(VecTask):
 
         self.dt = self.cfg["sim"]["dt"]
         self.test = self.cfg["sim"]["test"]
+        self.fancyTest = self.cfg["viewer"]["fancyTest"]["test"]
         self.set_location = self.cfg["env"]["asset"]["setLoc"]
         
         self.actions_cost_scale = self.cfg["env"]["actionsCost"]
@@ -75,6 +76,19 @@ class Bumpybot(VecTask):
         self.rgb_w = self.cfg["viewer"]["width"]
 
         if self.record:
+            if self.fancyTest:
+                self.fancyTest_h = [self.cfg["viewer"]["fancyTest"]["cam_0"]["height"]]
+                self.fancyTest_w = [self.cfg["viewer"]["fancyTest"]["cam_0"]["width"]]
+                self.fancyTest_pos = [None]
+                self.fancyTest_tgt = [None]
+                self.fancyTest_num = 1
+                for k,v in self.cfg["viewer"]["fancyTest"]["cams"].items():
+                    self.fancyTest_h.append(v["height"])
+                    self.fancyTest_w.append(v["width"])
+                    self.fancyTest_pos.append(v["pos"])
+                    self.fancyTest_tgt.append(v["target"])
+                    self.fancyTest_num += 1
+
             self._set_fig()
             self.fps = int((self.dt * self.update_freq)**-1)
             #if self.test:
@@ -166,6 +180,17 @@ class Bumpybot(VecTask):
         self.fig_rgb.subplots_adjust(left=0,bottom=0,right=1,top=1,wspace=None,hspace=None)
         self.ax_rgb.set_axis_off()
         self.frames_rgb = []
+
+        if self.fancyTest:
+            self.fancyTest_figs = []
+            self.fancyTest_axes = []
+            self.fancyTest_frames = [[] for _ in range(self.fancyTest_num)]
+            for i in range(self.fancyTest_num):
+                fig,ax = plt.subplots()
+                fig.subplots_adjust(left=0,bottom=0,right=1,top=1,wspace=None,hspace=None)
+                ax.set_axis_off()
+                self.fancyTest_figs.append(fig)
+                self.fancyTest_axes.append(ax)
 
         self.fig_q,self.ax_q = plt.subplots(3,1)
         self.fig_qdot,self.ax_qdot = plt.subplots(3,1)
@@ -334,7 +359,6 @@ class Bumpybot(VecTask):
         else:
             err_fname = "{dir}/test/error.png".format(dir=self.video_dir,reset=self.resets)
         self.fig_err.savefig(err_fname)
-
         self.ax_contact[0].plot(t,self.heading_hist,label="heading diff")
         self.ax_contact[0].plot(t,self.heading_motion,label="heading motion")
         self.ax_contact[0].plot(t,self.heading_cam,label="heading cam")
@@ -342,13 +366,15 @@ class Bumpybot(VecTask):
         self.ax_contact[0].legend(loc="upper right")
         self.ax_contact[0].set_xticks([])
         self.ax_contact[1].plot(t,self.contact_hist,label="contact",zorder=10)
-        if self.num_humans > 0:
-            for i in range(self.num_humans):
-                self.ax_contact[1].plot(t,self.human_contact_hists[i],label="human {}".format(i))
+        #if self.num_humans > 0:
+        #    for i in range(self.num_humans):
+        #        self.ax_contact[1].plot(t,self.human_contact_hists[i],label="human {}".format(i))
+        self.ax_contact[1].plot(t,[0.5 for i in range(len(self.x_hist))],linestyle="--",color="grey")
+        self.ax_contact[1].plot(t,[1 for i in range(len(self.x_hist))],linestyle="--",color="grey")
         self.ax_contact[1].set_ylim([0,1.1])
         self.ax_contact[1].set_ylabel("contact ratio")
         self.ax_contact[1].set_xlabel("steps")
-        self.ax_contact[1].legend(loc="upper right")
+        #self.ax_contact[1].legend(loc="upper right")
         self.fig_contact.suptitle("Heading & Contact",fontsize=16)
         #self.fig_contact.legend(loc="upper right")
         if label == "train":
@@ -421,6 +447,8 @@ class Bumpybot(VecTask):
 
         if "asset" in self.cfg["env"]:
             asset_file = self.cfg["env"]["asset"].get("assetFileName", asset_file)
+            if self.fancyTest:
+                asset_file = self.cfg["viewer"]["fancyTest"]["fancyUrdf"]
             occ_file = self.cfg["env"]["asset"].get("occupancyFileName", occ_file)
             human_file = self.cfg["env"]["asset"].get("humanFileName", human_file)
 
@@ -467,11 +495,13 @@ class Bumpybot(VecTask):
         else:
             human_loc_data_path = occ_root+"/human_loc_data_"+os.path.basename(occ_path).split(".")[0]+".txt"
             self.num_human_samples = self.cfg["env"]["asset"]["numSamples"]
+            human_start = start[:]
+            human_start[1] += self.cfg["env"]["asset"]["start_offset"]
             human_target = target[:]
-            human_target[1] -= 1 #give free space to move into at end of path
+            human_target[1] -= self.cfg["env"]["asset"]["end_offset"] #give free space to move into at end of path
             if not os.path.exists(human_loc_data_path):
                 print("Generating human location data...")
-                self.loc_data = torch.tensor(env_c.generate_loc_data(start,target,self.num_humans,n=self.num_human_samples,output_dir=occ_root))
+                self.loc_data = torch.tensor(env_c.generate_loc_data(human_start,human_target,self.num_humans,n=self.num_human_samples,output_dir=occ_root))
                 print("Done.")
             else:
                 from ast import literal_eval
@@ -482,7 +512,7 @@ class Bumpybot(VecTask):
                         if self.loc_data.size()[0] < self.num_human_samples or self.loc_data.size()[1] < self.num_humans:
                             print("Retrieval failed.")
                             print("Generating human location data...")
-                            self.loc_data = torch.tensor(env_c.generate_loc_data(start,target,self.num_humans,n=self.num_human_samples,output_dir=occ_root))
+                            self.loc_data = torch.tensor(env_c.generate_loc_data(human_start,human_target,self.num_humans,n=self.num_human_samples,output_dir=occ_root))
                 print("Done.")
 
         self.num_assets = 0
@@ -575,6 +605,15 @@ class Bumpybot(VecTask):
             camera_props_rgb.height = self.rgb_h #self.img_h
             camera_props_rgb.use_collision_geometry = False
             camera_props_rgb.enable_tensors = True
+            if self.fancyTest:
+                fancy_camera_props = []
+                for i in range(self.fancyTest_num):
+                    prop = gymapi.CameraProperties()
+                    prop.height = self.fancyTest_h[i]
+                    prop.width = self.fancyTest_w[i]
+                    prop.use_collision_geometry = False
+                    prop.enable_tensors = True
+                    fancy_camera_props.append(prop)
 
         for i in range(self.num_envs):
             # create env instance
@@ -624,6 +663,27 @@ class Bumpybot(VecTask):
                 cam_tensor_rgb = self.gym.get_camera_image_gpu_tensor(self.sim,env, camera_handle_rgb, gymapi.IMAGE_COLOR)
                 self.torch_cam_tensor_rgb = gymtorch.wrap_tensor(cam_tensor_rgb)
 
+                if self.fancyTest:
+                    self.fancy_cam_handles = []
+                    self.fancy_cam_tensors = []
+
+                    cam_hndl = self.gym.create_camera_sensor(env,fancy_camera_props[0])
+                    self.gym.attach_camera_to_body(cam_hndl, env, handle, camera_pose, self.camera_mode)
+                    self.fancy_cam_handles.append(cam_hndl)
+                    fancy_cam_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, env, cam_hndl, gymapi.IMAGE_COLOR)
+                    torch_fancy_cam_tensor = gymtorch.wrap_tensor(fancy_cam_tensor)
+                    self.fancy_cam_tensors.append(torch_fancy_cam_tensor)
+
+                    for i in range(1,self.fancyTest_num):
+                        cam_hndl = self.gym.create_camera_sensor(env,fancy_camera_props[i])
+                        self.gym.set_camera_location(
+                            cam_hndl, env, 
+                            gymapi.Vec3(*self.fancyTest_pos[i]),
+                            gymapi.Vec3(*self.fancyTest_tgt[i]))
+                        fancy_cam_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, env, cam_hndl, gymapi.IMAGE_COLOR)
+                        torch_fancy_cam_tensor = gymtorch.wrap_tensor(fancy_cam_tensor)
+                        self.fancy_cam_tensors.append(torch_fancy_cam_tensor)
+
             props_shape = self.gym.get_actor_rigid_shape_properties(env, handle)
             props_shape[0].rolling_friction = 0.0
             props_shape[0].torsion_friction = 0.0
@@ -643,6 +703,7 @@ class Bumpybot(VecTask):
         super().allocate_buffers()
         self.img_tensor = torch.zeros(self.num_envs,self.img_w,self.img_h,self.channels,device=self.device)
         self.frames_in_contact = torch.zeros_like(self.progress_buf,device=self.device)
+        self.image_reset = torch.zeros(self.num_envs,device=self.device)
 
     def _get_images(self):
         if self.steps % self.update_freq and not self.test:
@@ -655,11 +716,13 @@ class Bumpybot(VecTask):
             img = self.cam_tensors[i].view(self.img_h,self.img_w) #self.img_d
             img = self._normalize_image(img)
             if self.fstack_num > 1:
-                for j in range(self.fstack_num-1):
-                    if self.prev_actions is None:
+                if self.image_reset[i]:
+                    for j in range(self.fstack_num-1):
                         self.img_tensor[i,:,:,j+1] = img
-                    else:
+                else:
+                    for j in range(self.fstack_num-1):
                         self.img_tensor[i,:,:,j+1] = self.img_tensor[i,:,:,j]
+                    self.image_reset[i] = 1
                 self.img_tensor[i,:,:,0] = img
             else:
                 self.img_tensor[i,...] = img
@@ -671,6 +734,11 @@ class Bumpybot(VecTask):
 
             img_rgb = self.torch_cam_tensor_rgb.view(self.rgb_h,self.rgb_w,4).cpu().numpy()
             self.frames_rgb.append([self.ax_rgb.imshow(img_rgb,animated=True)])
+
+            if self.fancyTest:
+                for i in range(self.fancyTest_num):
+                    fancy_img = self.fancy_cam_tensors[i].view(self.fancyTest_h[i],self.fancyTest_w[i],4).cpu().numpy()
+                    self.fancyTest_frames[i].append([self.fancyTest_axes[i].imshow(fancy_img,animated=True)])
        
         self.gym.end_access_image_tensors(self.sim)            
 
@@ -741,13 +809,13 @@ class Bumpybot(VecTask):
 
     def reset_idx(self, env_ids):
 
+        pose = torch.zeros_like(self.initial_root_state)
         vels = torch.cat((
             torch.zeros(len(env_ids),7,device=self.device), #pose,quat
             torch_rand_float(-0.1, 0.1, (len(env_ids),2), device=self.device), #vx,vy
-            torch.zeros(len(env_ids),4,device=self.device) #vy,v_ang
+            torch.zeros(len(env_ids),3,device=self.device), #vy,v_ang
+            torch_rand_float(-0.5, 0.5, (len(env_ids),1), device=self.device)
             ),dim=-1)
-        pose = torch.zeros_like(self.initial_root_state)
-
         pose[self.num_assets*env_ids] = vels
 
         random_root = self.initial_root_state + pose
@@ -759,7 +827,8 @@ class Bumpybot(VecTask):
 
         self.progress_buf[env_ids] = 0
         self.reset_buf[env_ids] = 0
-        self.img_tensor[env_ids] = self.init_img_tensor[env_ids]
+        self.image_reset[env_ids] = 0
+        #self.img_tensor[env_ids] = self.init_img_tensor[env_ids]
 
     def pre_physics_step(self, actions):
         # implement pre-physics simulation code here
@@ -834,6 +903,13 @@ class Bumpybot(VecTask):
                         if not os.path.exists(rgb_vdir):
                             os.makedirs(rgb_vdir)
                         rgb_vname = "{dir}/rgb.mp4".format(dir=rgb_vdir)
+                    
+                        if self.fancyTest:
+                            for i in range(self.fancyTest_num):
+                                fancy_vname = "{dir}/rgb{n}.mp4".format(dir=rgb_vdir,n=i)
+                                ani_fancy = animation.ArtistAnimation(self.fancyTest_figs[i],self.fancyTest_frames[i],interval=int(1000/self.fps),blit=True,repeat=False)
+                                ani_fancy.save(fancy_vname,writer=self.writer)
+
                     else:
                         rgb_vdir = "{dir}/train_reset{reset}".format(dir=self.video_dir,reset=self.resets)
                         if not os.path.exists(rgb_vdir):
@@ -843,6 +919,7 @@ class Bumpybot(VecTask):
                     ani_rgb = animation.ArtistAnimation(self.fig_rgb,self.frames_rgb,interval=int(1000/self.fps),blit=True,repeat=False)
                     ani_rgb.save(rgb_vname,writer=self.writer)
                     rgb_flag = True
+
                 if len(self.frames) > 1:
                     if self.test:
                         vdir = "{dir}/test".format(dir=self.video_dir)

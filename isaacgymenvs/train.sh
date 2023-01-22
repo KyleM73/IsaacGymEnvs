@@ -1,6 +1,6 @@
 #!/bin/bash
 task=Bumpybot
-experimentName=Bumpybot
+experimentName=Bumpybot_1_18_23
 checkpoint=runs/$experimentName/nn/$experimentName.pth
 progressFile=runs/$experimentName/progress.txt
 
@@ -33,3 +33,12 @@ echo testing: done > $progressFile
 cp $progressFile ~/Dropbox/UT/Experiments/$task/$experimentName
 
 echo "Training Complete."
+
+
+
+## TO DO
+# - randomize human locations on reset
+# - make contacts more costly (reset on thresh instead of lim?)
+# - depth camera noise
+# - impliment sliding DS control
+# - add cameras for fancy recording

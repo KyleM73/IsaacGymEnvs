@@ -15,7 +15,7 @@ fi
 echo Running $numTests tests with $numHumans humans
 
 task=Bumpybot
-experimentName=Bumpybot
+experimentName=Bumpybot_1_18_23
 checkpoint=runs/$experimentName/nn/$experimentName.pth
 
 dt=$(date '+%m_%d_%Y-%H_%M')
@@ -24,8 +24,8 @@ for i in $(seq $numTests)
 do
     saveviddir=$viddir/test$(($i-1))
     echo Saving to dir $saveviddir
-    python train.py test=True task=Bumpybot headless=True task.env.asset.numHumans=$numHumans experiment=$experimentName num_envs=1 train.params.config.minibatch_size=20 checkpoint=$checkpoint task.videoDir=$viddir
-    mv runs/$experimentName/videos/$viddir/test runs/$experimentName/videos/$viddir/test$(($i-1))
+    python train.py test=True task=Bumpybot headless=True task.env.asset.numHumans=$numHumans experiment=$experimentName num_envs=1 train.params.config.minibatch_size=20 checkpoint=$checkpoint task.videoDir=$viddir task.viewer.fancyTest.test=True
+    mv runs/$task/videos/$viddir/test runs/$task/videos/$viddir/test$(($i-1))
 done
 
-cp -r runs/$experimentName/videos/$viddir ~/Dropbox/UT/Experiments/$task/$experimentName
+cp -r runs/$task/videos/$viddir ~/Dropbox/UT/Experiments/$task/$experimentName
