@@ -100,7 +100,7 @@ def export_model(cfg: DictConfig):
         print(net(inputs))
         print(traced(*adapter.flattened_inputs))
         
-    torch.onnx.export(traced, adapter.flattened_inputs, onnx_fname, verbose=True, input_names=["obs"], output_names=["mu","log_std", "value"])
+    torch.onnx.export(traced, adapter.flattened_inputs, onnx_fname, verbose=True, input_names=["img","vec"], output_names=["mu","log_std", "value"])
 
     # check that the model is well formed
     #onnx_model = onnx.load(onnx_fname)
