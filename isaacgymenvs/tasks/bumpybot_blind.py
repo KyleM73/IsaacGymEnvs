@@ -449,8 +449,8 @@ class Bumpybot_blind(VecTask):
             if not os.path.exists(human_loc_data_path):
                 print("Generating human location data...")
                 self.loc_data = torch.tensor(env_c.generate_loc_data(
-                    human_start,human_target,self.num_humans,start_free_zone=0.6,end_free_zone=0,
-                    n=self.num_human_samples,output_dir=occ_root))
+                    human_start,human_target,self.num_humans,start_free_zone=1.0,end_free_zone=0,
+                    n=self.num_human_samples,output_dir=occ_root)) #0.6 start free zone
                 print("Done.")
             else:
                 from ast import literal_eval
@@ -462,8 +462,8 @@ class Bumpybot_blind(VecTask):
                             print("Retrieval failed.")
                             print("Generating human location data...")
                             self.loc_data = torch.tensor(env_c.generate_loc_data(
-                                human_start,human_target,self.num_humans,start_free_zone=0.6,end_free_zone=0,
-                                n=self.num_human_samples,output_dir=occ_root))
+                                human_start,human_target,self.num_humans,start_free_zone=1.0,end_free_zone=0,
+                                n=self.num_human_samples,output_dir=occ_root)) #0.6 start free zone
                 print("Done.")
 
         self.num_assets = 0
@@ -598,6 +598,10 @@ class Bumpybot_blind(VecTask):
                 if self.fancyTest:
                     self.fancy_cam_handles = []
                     self.fancy_cam_tensors = []
+
+                    camera_pose = gymapi.Transform()
+                    camera_pose.p = gymapi.Vec3(0.2657,0,0.4850) # get real values from robot
+                    camera_pose.r = gymapi.Quat.from_euler_zyx(0,0,0)
 
                     cam_hndl = self.gym.create_camera_sensor(env,fancy_camera_props[0])
                     self.gym.attach_camera_to_body(cam_hndl, env, handle, camera_pose, self.camera_mode)
@@ -797,11 +801,15 @@ class Bumpybot_blind(VecTask):
                                 ani_fancy = animation.ArtistAnimation(self.fancyTest_figs[i],self.fancyTest_frames[i],interval=int(1000/self.fps),blit=True,repeat=False)
                                 ani_fancy.save(fancy_vname,writer=self.writer)
 
+                        self._make_plots("test")
+
                     else:
                         rgb_vdir = "{dir}/train_reset{reset}".format(dir=self.video_dir,reset=self.resets)
                         if not os.path.exists(rgb_vdir):
                             os.makedirs(rgb_vdir)
                         rgb_vname = "{dir}/rgb.mp4".format(dir=rgb_vdir)
+
+                        self._make_plots("train")
 
                     ani_rgb = animation.ArtistAnimation(self.fig_rgb,self.frames_rgb,interval=int(1000/self.fps),blit=True,repeat=False)
                     ani_rgb.save(rgb_vname,writer=self.writer)
