@@ -1,0 +1,299 @@
+train.py:49: UserWarning: 
+The version_base parameter is not specified.
+Please specify a compatability version level, or None.
+Will assume defaults for version 1.1
+  @hydra.main(config_name="config", config_path="./cfg")
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/defaults_list.py:251: UserWarning: In 'config': Defaults list is missing `_self_`. See https://hydra.cc/docs/upgrades/1.0_to_1.1/default_composition_order for more information
+  warnings.warn(msg, UserWarning)
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/defaults_list.py:415: UserWarning: In config: Invalid overriding of hydra/job_logging:
+Default list overrides requires 'override' keyword.
+See https://hydra.cc/docs/next/upgrades/1.0_to_1.1/defaults_list_override for more information.
+
+  deprecation_warning(msg)
+Importing module 'gym_38' (/home/kylem/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/kylem/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1
+Device count 2
+/home/kylem/isaacgym/python/isaacgym/_bindings/src/gymtorch
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/hydra/_internal/hydra.py:119: UserWarning: Future Hydra versions will no longer change working directory at job runtime by default.
+See https://hydra.cc/docs/next/upgrades/1.1_to_1.2/changes_to_job_working_dir/ for more information.
+  ret = run_job(
+Using /home/kylem/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/kylem/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Loading extension module gymtorch...
+/home/kylem/isaacgym/python/isaacgym/torch_utils.py:135: DeprecationWarning: `np.float` is a deprecated alias for the builtin `float`. To silence this warning, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+Deprecated in NumPy 1.20; for more details and guidance: https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+  def get_axis_params(value, axis_idx, x_value=0., dtype=np.float, n_dims=3):
+2023-04-14 11:37:14,278 - INFO - logger - logger initialized
+[Warning] [carb.gym.plugin] useGpu is set, forcing single scene (0 subscenes)
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+/opt/conda/conda-bld/pytorch_1670525552411/work/aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [1,0,0], thread: [64,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+/opt/conda/conda-bld/pytorch_1670525552411/work/aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [1,0,0], thread: [65,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+<unknown>:3: DeprecationWarning: invalid escape sequence \*
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/torch/utils/tensorboard/__init__.py:4: DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.
+  if not hasattr(tensorboard, "__version__") or LooseVersion(
+/home/kylem/anaconda3/envs/isaac/lib/python3.8/site-packages/gym/spaces/box.py:84: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+Error: FBX library failed to load - importing FBX data will not succeed. Message: No module named 'fbx'
+FBX tools must be installed from https://help.autodesk.com/view/FBX/2020/ENU/?guid=FBX_Developer_Help_scripting_with_python_fbx_installing_python_fbx_html
+task: 
+    name: Bumpybot_gazebo
+    physics_engine: physx
+    videoDir: 
+    env: 
+        numEnvs: 512
+        envSpacing: 3
+        episodeLength: 500
+        controlFrequencyInv: 10
+        enableDebugVis: False
+        velocityMax: 1.0
+        velocityGoal: 1.0
+        angVelocityGoal: 0
+        goalRadius: 0.2
+        rewardScale: 1
+        actionsCost: 1
+        poseCost: 1
+        angCost: 1
+        velocityCost: 1
+        angularVelocityCost: 1
+        contactCost: 1
+        contactLimit: 130
+        contactThreshold: 65
+        deathCost: -1000
+        goalBonus: 200
+        forceScale: 20
+        torqueScale: 1.28
+        asset: 
+            assetFileName: urdf/bumpybot.urdf
+            occupancyFileName: occupancy/hall.png
+            humanFileName: urdf/human/human.urdf
+            numHumans: 0
+            numSamples: 4096
+            testIdx: 0
+            setLoc: False
+            start_offset: 0
+            end_offset: 0
+        path: 
+            start: [0, 0]
+            target: [0, 5]
+            filterDist: 0.45
+            showPath: False
+        plane: 
+            staticFriction: 0.0
+            dynamicFriction: 0.0
+            restitution: 0.0
+        enableCameraSensors: True
+    image: 
+        height: 128
+        width: 128
+        depth: 1
+        fstack: 5
+        range: 2.5
+        minRange: 0.25
+        updateFreq: 10
+        fixCamera: False
+        FOV: 120
+    viewer: 
+        height: 1080
+        width: 1920
+        pos: [-2.0, 4.0, 6.0]
+        target: [0.0, 4.0, 0.0]
+        captureVideo: False
+        captureOnce: False
+        captureVideoFreq: 10
+        fancyTest: 
+            fancyUrdf: urdf/bumpybot_fancy.urdf
+            test: False
+            cam_0: 
+                height: 1440
+                width: 1440
+            cams: 
+                cam_1: 
+                    height: 1440
+                    width: 2560
+                    pos: [-2.0, 4.0, 6.0]
+                    target: [0.0, 4.0, 0.0]
+                cam_2: 
+                    height: 1440
+                    width: 2560
+                    pos: [2.0, 4.0, 6.0]
+                    target: [0.0, 4.0, 0.0]
+                cam_3: 
+                    height: 2560
+                    width: 1440
+                    pos: [0.0, 4.0, 4.0]
+                    target: [0.0, 4.1, 0]
+                cam_4: 
+                    height: 1440
+                    width: 1440
+                    pos: [0.0, 0.0, 2.0]
+                    target: [0.0, 4.0, 0.0]
+                cam_5: 
+                    height: 1440
+                    width: 1440
+                    pos: [0.0, 10.0, 2.0]
+                    target: [0.0, 4.0, 0.0]
+    sim: 
+        test: False
+        dt: 0.01
+        substeps: 4
+        up_axis: z
+        use_gpu_pipeline: True
+        gravity: [0.0, 0.0, -9.81]
+        physx: 
+            num_threads: 4
+            solver_type: 1
+            use_gpu: True
+            num_position_iterations: 4
+            num_velocity_iterations: 1
+            contact_offset: 0.02
+            rest_offset: 0.01
+            bounce_threshold_velocity: 0.2
+            max_depenetration_velocity: 100.0
+            default_buffer_size_multiplier: 5.0
+            max_gpu_contact_pairs: 8388608
+            num_subscenes: 4
+            contact_collection: 1
+train: 
+    params: 
+        seed: 42
+        algo: 
+            name: a2c_continuous
+        model: 
+            name: continuous_a2c_logstd
+        network: 
+            name: actor_critic
+            separate: False
+            space: 
+                continuous: 
+                    mu_activation: tanh
+                    sigma_activation: None
+                    mu_init: 
+                        name: default
+                    sigma_init: 
+                        name: const_initializer
+                        val: 0
+                    fixed_sigma: True
+            mlp: 
+                units: [256, 128, 64]
+                activation: elu
+                d2rl: False
+                initializer: 
+                    name: default
+                regularizer: 
+                    name: None
+        load_checkpoint: False
+        load_path: 
+        config: 
+            name: Bumpybot_gazebo
+            full_experiment_name: Bumpybot_gazebo
+            env_name: rlgpu
+            multi_gpu: False
+            mixed_precision: True
+            normalize_input: True
+            normalize_value: True
+            value_bootstrap: True
+            num_actors: 512
+            reward_shaper: 
+                scale_value: 0.01
+            normalize_advantage: True
+            gamma: 0.99
+            tau: 0.95
+            learning_rate: 0.0005
+            lr_schedule: adaptive
+            kl_threshold: 0.008
+            score_to_win: 10000
+            max_epochs: 1000
+            save_best_after: 100
+            save_frequency: 100
+            print_stats: True
+            grad_norm: 1.0
+            entropy_coef: 0.0
+            truncate_grads: True
+            ppo: True
+            e_clip: 0.2
+            horizon_length: 32
+            minibatch_size: 16384
+            mini_epochs: 5
+            critic_coef: 4
+            clip_value: True
+            seq_len: 4
+            bounds_loss_coef: 0.0001
+task_name: Bumpybot_gazebo
+experiment: 
+num_envs: 
+seed: 42
+torch_deterministic: False
+max_iterations: 
+physics_engine: physx
+pipeline: gpu
+sim_device: cuda:0
+rl_device: cuda:0
+graphics_device_id: 0
+num_threads: 4
+solver_type: 1
+num_subscenes: 4
+test: False
+checkpoint: 
+multi_gpu: False
+wandb_activate: False
+wandb_group: 
+wandb_name: Bumpybot_gazebo
+wandb_entity: HCRL
+wandb_project: isaacgymenvs
+capture_video: False
+capture_video_freq: 1000
+capture_video_len: 100
+force_render: True
+headless: True
+Setting seed: 42
+self.seed = 42
+Started to train
+Exact experiment name requested from command line: Bumpybot_gazebo
+Path:  tensor([[ 1.0000e+00,  0.0000e+00],
+        [ 8.6603e-01,  5.0000e-01],
+        [ 5.0000e-01,  8.6603e-01],
+        [-4.3711e-08,  1.0000e+00],
+        [-5.0000e-01,  8.6603e-01],
+        [-8.6603e-01,  5.0000e-01],
+        [-1.0000e+00, -8.7423e-08],
+        [-8.6603e-01, -5.0000e-01],
+        [-5.0000e-01, -8.6603e-01],
+        [ 1.1925e-08, -1.0000e+00],
+        [ 5.0000e-01, -8.6603e-01],
+        [ 8.6603e-01, -5.0000e-01],
+        [ 1.0000e+00,  1.7485e-07]])
+Box(-1.0, 1.0, (2,), float32) Box(-inf, inf, (9,), float32)
+current training device: cuda:0
+build mlp: 9
+RunningMeanStd:  (1,)
+RunningMeanStd:  (9,)
+fps step: 2782 fps step and policy inference: 2546 fps total: 2538 epoch: 1/1000
+fps step: 3662 fps step and policy inference: 3634 fps total: 3620 epoch: 2/1000
+fps step: 3675 fps step and policy inference: 3647 fps total: 3631 epoch: 3/1000
+Error executing job with overrides: ['test=False', 'task=Bumpybot_gazebo', 'headless=True']
+Traceback (most recent call last):
+  File "train.py", line 156, in launch_rlg_hydra
+    runner.run({
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/torch_runner.py", line 120, in run
+    self.run_train(args)
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/torch_runner.py", line 101, in run_train
+    agent.train()
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/common/a2c_common.py", line 1173, in train
+    step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul = self.train_epoch()
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/common/a2c_common.py", line 1037, in train_epoch
+    batch_dict = self.play_steps()
+  File "/home/kylem/Research/isaac/IsaacGymEnvs/rl_games/rl_games/common/a2c_common.py", line 649, in play_steps
+    all_done_indices = self.dones.nonzero(as_tuple=False)
+RuntimeError: CUDA error: device-side assert triggered
+CUDA kernel errors might be asynchronously reported at some other API call,so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1.
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
