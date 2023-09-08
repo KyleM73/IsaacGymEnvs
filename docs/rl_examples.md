@@ -12,21 +12,23 @@ training progress.
 List of Examples
 ----------------
 
-* [Ant](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#ant-antpy)
-* [Humanoid](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#humanoid-humanoidpy)
-* [Shadow Hand](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#shadow-hand-object-manipulation-shadow_handpy)
-* [Allegro Hand](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#allegro-hand-allegro_handpy)
-* [ANYmal](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#anymal-anymalpy)
-* [ANYmal Rough Terrain](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#anymal-rough-terrain-anymal_terrainpy)
-* [TriFinger](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#trifinger-trifingerpy)
-* [NASA Ingenuity Helicopter](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#nasa-ingenuity-helicopter-ingenuitypy)
-* [Cartpole](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#cartpole-cartpolepy)
-* [Ball Balance](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#ball-balance-ball_balancepy)
-* [Franka Cabinet](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#franka-cabinet-franka_cabinetpy)
-* [Franka Cube Stack](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#franka-cube-stack-franka_cube_stackpy)
-* [Quadcopter](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#quadcopter-quadcopterpy)
-* [Adversarial Motion Priors](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#amp-adversarial-motion-priors-humanoidamppy)
-* [Factory](https://gitlab-master.nvidia.com/carbon-gym/isaacgymenvs/-/blob/dev/docs/rl_examples.md#factory-fast-contact-for-robotic-assembly)
+* [Ant](#ant-antpy)
+* [Humanoid](#humanoid-humanoidpy)
+* [Shadow Hand](#shadow-hand-object-manipulation-shadow_handpy)
+* [Allegro Hand](#allegro-hand-allegro_handpy)
+* [ANYmal](#anymal-anymalpy)
+* [ANYmal Rough Terrain](#anymal-rough-terrain-anymal_terrainpy)
+* [TriFinger](#trifinger-trifingerpy)
+* [NASA Ingenuity Helicopter](#nasa-ingenuity-helicopter-ingenuitypy)
+* [Cartpole](#cartpole-cartpolepy)
+* [Ball Balance](#ball-balance-ball_balancepy)
+* [Franka Cabinet](#franka-cabinet-franka_cabinetpy)
+* [Franka Cube Stack](#franka-cube-stack-franka_cube_stackpy)
+* [Quadcopter](#quadcopter-quadcopterpy)
+* [Adversarial Motion Priors](#amp-adversarial-motion-priors-humanoidamppy)
+* [Factory](#factory-fast-contact-for-robotic-assembly)
+* [DeXtreme](#dextreme-transfer-of-agile-in-hand-manipulation-from-simulation-to-reality)
+* [DexPBT](#dexpbt-scaling-up-dexterous-manipulation-for-hand-arm-systems-with-population-based-training)
 
 ### Ant [ant.py](../isaacgymenvs/tasks/ant.py)
 
@@ -50,10 +52,15 @@ APIs for setting select ants into a valid starting state.
 
 It can be launched with command line argument `task=Ant`.
 
-Config files used for this task are:
+Config files used for this task to train with PPO are:
 
 -   **Task config**: [Ant.yaml](../isaacgymenvs/cfg/task/Ant.yaml)
 -   **rl_games training config**: [AntPPO.yaml](../isaacgymenvs/cfg/train/AntPPO.yaml)
+
+With SAC:
+
+-   **Task config**: [AntSAC.yaml](../isaacgymenvs/cfg/task/AntSAC.yaml)
+-   **rl_games training config**: [AntSAC.yaml](../isaacgymenvs/cfg/train/AntSAC.yaml)
 
 ![Ant_running](https://user-images.githubusercontent.com/463063/125260924-a5969800-e2b5-11eb-931c-116cc90d4bbe.gif) 
 
@@ -68,10 +75,15 @@ contacts with the ground plane on the humanoids' feet.
 
 It can be launched with command line argument `task=Humanoid`.
 
-Config files used for this task are:
+Config files used for this task to train with PPO are:
 
 -   **Task config**: [Humanoid.yaml](../isaacgymenvs/cfg/task/Humanoid.yaml)
 -   **rl_games training config**: [HumanoidPPO.yaml](../isaacgymenvs/cfg/train/HumanoidPPO.yaml)
+
+With SAC:
+
+-   **Task config**: [HumanoidSAC.yaml](../isaacgymenvs/cfg/task/HumanoidSAC.yaml)
+-   **rl_games training config**: [HumanoidSAC.yaml](../isaacgymenvs/cfg/train/HumanoidSAC.yaml)
 
 ![Humanoid_running](https://user-images.githubusercontent.com/463063/125266095-4edf8d00-e2ba-11eb-9c1a-4dc1524adf71.gif)
 
@@ -211,7 +223,8 @@ do not typically correspond to the best outcome.
       title={Learning to Walk in Minutes Using Massively Parallel Deep Reinforcement Learning}, 
       author={Nikita Rudin and David Hoeller and Philipp Reist and Marco Hutter},
       year={2021},
-      journal = {arXiv preprint arXiv:2109.11978}
+      journal = {arXiv preprint arXiv:2109.11978},
+}
 ```
 **Note** The IsaacGymEnvs implementation slightly differs from the implementation used in the paper above, which also
 uses a different RL library and PPO implementation. The original implementation will be made available [here](https://github.com/leggedrobotics/legged_gym). Results reported in the Isaac Gym technical paper are based on that repository, not this one.
@@ -412,3 +425,90 @@ Also note that our original formulations of SDF collisions and contact reduction
 ![Nut_picking](https://user-images.githubusercontent.com/7465068/176542463-dd2d3980-c9d1-4b90-8fd2-7e23161905e9.gif)
 ![Nut_placing](https://user-images.githubusercontent.com/7465068/176544020-ff6a56b6-7359-4580-b789-f9ba43e78459.gif)
 ![Nut_screwing](https://user-images.githubusercontent.com/7465068/176528998-8a3dd41d-1a8f-4c1c-a6cd-f6eeb91ea87a.gif)
+
+### DeXtreme: Transfer of Agile In-hand Manipulation from Simulation to Reality
+
+DeXtreme provides an example of sim-to-real transfer of dexterous manipulation with an Allegro Hand including Automatic Domain Randomization (ADR). You can read further details of the task in the [extended documentation](dextreme.md) and additional information about ADR [here](domain_randomization.md).
+
+There are two [DeXtreme](https://dextreme.org) tasks: **AllegroHandDextremeManualDR** and **AllegroHandDextremeADR**. They are both compatible with the standard way of training in Isaac Gym via `python train.py task=<AllegroHandDextremeManualDR or AllegroHandDextremeADR>`. For reproducibility, we provide the exact settings with which we trained for those environments.
+
+For `AllegroHandDextremeManualDR`, you should use the following command for training 
+
+```
+HYDRA_MANUAL_DR="train.py multi_gpu=False \
+task=AllegroHandDextremeManualDR \
+task.env.resetTime=8 task.env.successTolerance=0.4 \
+experiment='allegrohand_dextreme_manual_dr' \
+headless=True seed=-1 \
+task.env.startObjectPoseDY=-0.15 \
+task.env.actionDeltaPenaltyScale=-0.2 \
+task.env.resetTime=8 \
+task.env.controlFrequencyInv=2 \
+train.params.network.mlp.units=[512,512] \
+train.params.network.rnn.units=768 \
+train.params.network.rnn.name=lstm \
+train.params.config.central_value_config.network.mlp.units=[1024,512,256] \
+train.params.config.max_epochs=50000 \
+task.env.apply_random_quat=True"
+
+
+python ${HYDRA_MANUAL_DR}
+```
+
+**TaskConfig** [AllegroHandDextremeManualDR.yaml](../isaacgymenvs/cfg/task/AllegroHandDextremeManualDR.yaml)
+
+**TrainConfig** [AllegroHandDextremeManualDRPPO.yaml](../isaacgymenvs/cfg/train/AllegroHandDextremeManualDRPPO.yaml)
+
+For `AllegroHandDextremeADR`, you should use the following command for training 
+
+```
+HYDRA_ADR="train.py multi_gpu=False \
+task=AllegroHandDextremeADR \
+headless=True seed=-1 \
+num_envs=8192 \
+task.env.resetTime=8 \
+task.env.controlFrequencyInv=2 \
+train.params.config.max_epochs=50000"
+
+python ${HYDRA_ADR}
+```
+
+**TaskConfig** [AllegroHandDextremeADR.yaml](../isaacgymenvs/cfg/task/AllegroHandDextremeADR.yaml)
+
+**TrainConfig** [AllegroHandDextremeADRPPO.yaml](../isaacgymenvs/cfg/train/AllegroHandDextremeADRPPO.yaml)
+
+![simulation](https://user-images.githubusercontent.com/686480/228693619-ad0b2da3-2829-4f38-af00-0c7249d32b6b.gif)
+
+![real-world](https://user-images.githubusercontent.com/686480/228693728-5e00c56b-0404-4a76-98f2-9ef6e2a20498.gif)
+
+More videos are available at [dextreme.org](https://dextreme.org)
+
+```
+@inproceedings{
+	handa2023dextreme,
+	author = {Ankur Handa, Arthur Allshire, Viktor Makoviychuk, Aleksei Petrenko, Ritvik Singh, Jingzhou Liu, Denys Makoviichuk, Karl Van Wyk, Alexander Zhurkevich, Balakumar Sundaralingam, Yashraj Narang, Jean-Francois Lafleche, Dieter Fox, Gavriel State},
+	title = {DeXtreme: Transfer of Agile In-hand Manipulation from Simulation to Reality},
+	booktitle = {ICRA},
+	year = {2023}
+}
+```
+
+### DexPBT: Scaling up Dexterous Manipulation for Hand-Arm Systems with Population Based Training
+
+DexPBT provides an example of solving challenging hand+arm dextrous manipulation tasks using Population Based Training (PBT). You can read further details of the tasks in the [extended documentation](pbd.md).
+
+There are two [DexPBT](https://sites.google.com/view/dexpbt) base environments, single- and dual-arms: **AllegroKukaLSTM** and **AllegroKukaTwoArmsLSTM** and a few different taks: reorientation, regrasping and grasp-and-throw for **AllegroKukaLSTM** and reorientation and regrasping for **AllegroKukaTwoArmsLSTM**. They are both compatible with the standard way of training in Isaac Gym via `python train.py task=AllegroKukaLSTM task/env=<reorientation or regrasping or throw>` `python train.py task=AllegroKukaTwoArmsLSTM task/env=<reorientation or regrasping>`. For reproducibility, we provide the exact settings with which we trained for those environments.
+
+![Training results](https://github.com/Denys88/rl_games/assets/463063/3c073a0a-69e7-4696-b86f-64c4c1a7e288)
+
+More videos are available at [https://sites.google.com/view/dexpbt](https://sites.google.com/view/dexpbt)
+
+```
+@inproceedings{
+	petrenko2023dexpbt,
+	author = {Aleksei Petrenko, Arthur Allshire, Gavriel State, Ankur Handa, Viktor Makoviychuk},
+	title = {DexPBT: Scaling up Dexterous Manipulation for Hand-Arm Systems with Population Based Training},
+	booktitle = {RSS},
+	year = {2023}
+}
+```
